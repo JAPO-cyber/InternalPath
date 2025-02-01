@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import pandas as pd
 import random
+from datetime import datetime, timedelta
 
 st.title("Pagina 2: Output della Configurazione dei Percorsi, Ordini e Frequenze dei Corridoi")
 
@@ -67,11 +68,17 @@ else:
 
     # --- Sezione: Generazione degli Ordini di Processo ---
     st.subheader("Ordini di Processo")
+    # Estrae gli ID delle macchine dai risultati (assumiamo che "macchine" sia una lista di oggetti Punto)
     machine_ids = [m.id for m in results["macchine"]]
     
     orders = []
+    # Per generare una data casuale, definiamo l'intervallo
+    start_date = datetime(2023, 1, 1)
+    end_date = datetime(2023, 12, 31)
+    delta_days = (end_date - start_date).days
+
     for i in range(1, 51):
-        n = random.randint(3, 5)
+        n = random.randint(3, 5)  # numero casuale di macchine per l'ordine (da 3 a 5)
         selected = random.sample(machine_ids, n)
         breakdown_list = []
         total_distance = 0
@@ -82,8 +89,12 @@ else:
                 d = float('inf')
             total_distance += d
             breakdown_list.append(f"{d:.2f}")
+        # Genera una data casuale all'interno dell'intervallo
+        random_days = random.randint(0, delta_days)
+        order_date = start_date + timedelta(days=random_days)
         orders.append({
             "Ordine": f"Ordine {i}",
+            "Date": order_date.strftime("%Y-%m-%d"),
             "Path": " -> ".join(selected),
             "Breakdown": " + ".join(breakdown_list),
             "Distance (m)": round(total_distance, 2)
@@ -98,49 +109,55 @@ else:
         file_name="ordini_di_processo.csv",
         mime="text/csv"
     )
+    
+    # --- Sezione: Filtro per Data ---
+    st.subheader("Filtro Ordini per Data")
+    # Imposta il range di date come valori di default
+    default_range = [start_date.date(), end_date.date()]
+    selected_range = st.date_input("Seleziona intervallo di date", default_range)
+    if isinstance(selected_range, tuple) or isinstance(selected_range, list):
+        filter_start, filter_end = selected_range
+    else:
+        filter_start = filter_end = selected_range
 
-    # --- Nuova Sezione: Grafico Frequenze degli Archi Utilizzati tra Punti Corridoio ---
-    st.subheader("Grafico Frequenze: Solo Punti Corridoio")
-    # Definiamo l'insieme degli ID corridoio
+    # Filtra gli ordini in base alla data selezionata
+    df_orders["Date"] = pd.to_datetime(df_orders["Date"])
+    df_filtered = df_orders[(df_orders["Date"] >= pd.to_datetime(filter_start)) & (df_orders["Date"] <= pd.to_datetime(filter_end))]
+    st.write("Ordini filtrati:")
+    st.dataframe(df_filtered)
+    
+    # --- Sezione: Grafico Frequenze degli Archi Utilizzati tra Punti Corridoio (solo per gli ordini filtrati) ---
+    st.subheader("Grafico Frequenze: Solo Punti Corridoio (Ordini Filtrati)")
+    # Definisci l'insieme degli ID corridoio
     corridor_ids = {c.id for c in results["corridoi"]}
-    # Calcola la frequenza degli archi, considerando solo quelli in cui entrambi i nodi sono corridoi,
-    # utilizzando i percorsi minimi calcolati tra macchine (results["percorsi_macchine"])
+    # Calcola la frequenza degli archi usando solo gli ordini filtrati
     edge_freq_corridor = {}
-    for (m1, m2), info in results["percorsi_macchine"].items():
-        path = info["path"]
-        if path is None:
-            continue
-        # Per ogni coppia consecutiva, se entrambi i nodi sono corridoi, aggiungili al conteggio
-        for i in range(len(path) - 1):
-            if path[i] in corridor_ids and path[i+1] in corridor_ids:
-                edge = (path[i], path[i+1])
+    for _, order in df_filtered.iterrows():
+        path_nodes = order["Path"].split(" -> ")
+        for i in range(len(path_nodes) - 1):
+            if path_nodes[i] in corridor_ids and path_nodes[i+1] in corridor_ids:
+                edge = (path_nodes[i], path_nodes[i+1])
                 edge_freq_corridor[edge] = edge_freq_corridor.get(edge, 0) + 1
 
-    # Costruiamo un grafo per le frequenze solo dei nodi corridoio
+    # Crea un grafo per le frequenze (solo nodi corridoio)
     freq_graph = nx.DiGraph()
-    # Aggiungiamo i nodi corridoio dal grafo originale
     for node in G.nodes():
         if node in corridor_ids:
             freq_graph.add_node(node, punto=G.nodes[node]['punto'])
-    # Aggiungiamo gli archi con la frequenza
     for (src, dst), freq in edge_freq_corridor.items():
         if src in freq_graph.nodes() and dst in freq_graph.nodes():
             freq_graph.add_edge(src, dst, frequency=freq)
-    # Posizioni: usa le stesse del grafo originale per i nodi corridoio
-    pos_freq = {}
-    for node in freq_graph.nodes():
-        pos_freq[node] = (G.nodes[node]['punto'].x, G.nodes[node]['punto'].y)
+    pos_freq = {node: (G.nodes[node]['punto'].x, G.nodes[node]['punto'].y) for node in freq_graph.nodes()}
     
     fig_freq, ax_freq = plt.subplots(figsize=(8, 6))
     nx.draw_networkx_nodes(freq_graph, pos_freq, node_color='blue', node_size=400, ax=ax_freq)
-    # Larghezza degli archi in base alla frequenza (scalata, ad esempio, per rendere più evidente)
     edge_widths = [freq_graph[u][v]['frequency'] * 1.5 for u, v in freq_graph.edges()]
     nx.draw_networkx_edges(freq_graph, pos_freq, ax=ax_freq, width=edge_widths, arrowstyle='->', arrowsize=15)
     nx.draw_networkx_labels(freq_graph, pos_freq, ax=ax_freq)
     edge_labels = {(u, v): freq_graph[u][v]['frequency'] for u, v in freq_graph.edges()}
     nx.draw_networkx_edge_labels(freq_graph, pos_freq, edge_labels=edge_labels, ax=ax_freq)
     
-    ax_freq.set_title("Frequenza di utilizzo degli archi (solo corridoi)")
+    ax_freq.set_title("Frequenza utilizzo degli archi (solo corridoi) [Ordini filtrati]")
     ax_freq.set_xlabel("Coordinata X")
     ax_freq.set_ylabel("Coordinata Y")
     ax_freq.axis('equal')
@@ -157,6 +174,7 @@ else:
         "orders": orders,
         "edge_frequency": edge_freq_corridor
     }
+
 
 
 
