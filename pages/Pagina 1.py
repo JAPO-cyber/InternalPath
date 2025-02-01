@@ -71,7 +71,6 @@ else:
     machine_ids = [m.id for m in results["macchine"]]
     
     orders = []
-    # Definisci l'intervallo di date per generare date casuali
     start_date = datetime(2023, 1, 1)
     end_date = datetime(2023, 12, 31)
     delta_days = (end_date - start_date).days
@@ -88,7 +87,6 @@ else:
                 d = float('inf')
             total_distance += d
             breakdown_list.append(f"{d:.2f}")
-        # Genera una data casuale all'interno dell'intervallo
         random_days = random.randint(0, delta_days)
         order_date = start_date + timedelta(days=random_days)
         orders.append({
@@ -135,20 +133,22 @@ else:
             if path_nodes[i] in corridor_ids and path_nodes[i+1] in corridor_ids:
                 edge = (path_nodes[i], path_nodes[i+1])
                 edge_freq_corridor[edge] = edge_freq_corridor.get(edge, 0) + 1
-
-    # Costruisci il grafo delle frequenze (solo per i nodi corridoio)
-    freq_graph = nx.DiGraph()
-    for node in G.nodes():
-        if node in corridor_ids:
-            freq_graph.add_node(node, punto=G.nodes[node]['punto'])
-    for (src, dst), freq in edge_freq_corridor.items():
-        if src in freq_graph.nodes() and dst in freq_graph.nodes():
-            freq_graph.add_edge(src, dst, frequency=freq)
-    pos_freq = {node: (G.nodes[node]['punto'].x, G.nodes[node]['punto'].y) for node in freq_graph.nodes()}
     
-    if freq_graph.number_of_edges() == 0:
+    # Debug: Visualizza il dizionario delle frequenze
+    st.write("Debug - Frequenze degli archi (solo corridoi):", edge_freq_corridor)
+    
+    if not edge_freq_corridor:
         st.info("Non sono presenti archi di corridoi nei percorsi filtrati.")
     else:
+        freq_graph = nx.DiGraph()
+        for node in G.nodes():
+            if node in corridor_ids:
+                freq_graph.add_node(node, punto=G.nodes[node]['punto'])
+        for (src, dst), freq in edge_freq_corridor.items():
+            if src in freq_graph.nodes() and dst in freq_graph.nodes():
+                freq_graph.add_edge(src, dst, frequency=freq)
+        pos_freq = {node: (G.nodes[node]['punto'].x, G.nodes[node]['punto'].y) for node in freq_graph.nodes()}
+        
         fig_freq, ax_freq = plt.subplots(figsize=(8, 6))
         nx.draw_networkx_nodes(freq_graph, pos_freq, node_color='blue', node_size=400, ax=ax_freq)
         edge_widths = [freq_graph[u][v]['frequency'] * 1.5 for u, v in freq_graph.edges()]
@@ -156,7 +156,7 @@ else:
         nx.draw_networkx_labels(freq_graph, pos_freq, ax=ax_freq)
         edge_labels = {(u, v): freq_graph[u][v]['frequency'] for u, v in freq_graph.edges()}
         nx.draw_networkx_edge_labels(freq_graph, pos_freq, edge_labels=edge_labels, ax=ax_freq)
-    
+        
         ax_freq.set_title("Frequenza utilizzo degli archi (solo corridoi) [Ordini filtrati]")
         ax_freq.set_xlabel("Coordinata X")
         ax_freq.set_ylabel("Coordinata Y")
@@ -174,5 +174,4 @@ else:
         "orders": orders,
         "edge_frequency": edge_freq_corridor
     }
-
 
