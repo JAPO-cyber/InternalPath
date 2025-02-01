@@ -4,7 +4,7 @@ import networkx as nx
 import pandas as pd
 import random
 
-st.title("Pagina 2: Output della Configurazione dei Percorsi e Ordini di Processo")
+st.title("Pagina 2: Output della Configurazione dei Percorsi, Ordini e Frequenze dei Corridoi")
 
 # Verifica se i risultati sono presenti nello stato della sessione
 if "computed_results" not in st.session_state:
@@ -25,8 +25,8 @@ else:
     df_paths = pd.DataFrame(rows)
     st.dataframe(df_paths)
 
-    # --- Sezione: Visualizzazione del Grafo ---
-    st.subheader("Grafico del Grafo")
+    # --- Sezione: Visualizzazione del Grafo Completo ---
+    st.subheader("Grafico del Grafo Completo")
     G = results["graph"]
     def disegna_grafo(G):
         pos = {}
@@ -70,7 +70,6 @@ else:
     machine_ids = [m.id for m in results["macchine"]]
     
     orders = []
-    # Genera 50 ordini con almeno 3 macchine per ordine (da 3 a 5)
     for i in range(1, 51):
         n = random.randint(3, 5)
         selected = random.sample(machine_ids, n)
@@ -99,49 +98,56 @@ else:
         file_name="ordini_di_processo.csv",
         mime="text/csv"
     )
-    
-    # --- Nuova Sezione: Grafico Frequenze degli Archi Utilizzati negli Ordini ---
-    st.subheader("Grafico Frequenze degli Archi Utilizzati negli Ordini")
-    # Calcola la frequenza di utilizzo di ciascun arco nei percorsi degli ordini
-    edge_freq = {}
-    for order in orders:
-        path_nodes = order["Path"].split(" -> ")
-        for i in range(len(path_nodes) - 1):
-            edge = (path_nodes[i], path_nodes[i+1])
-            edge_freq[edge] = edge_freq.get(edge, 0) + 1
 
-    # Crea un grafo per le frequenze (utilizziamo un grafo diretto)
+    # --- Nuova Sezione: Grafico Frequenze degli Archi Utilizzati tra Punti Corridoio ---
+    st.subheader("Grafico Frequenze: Solo Punti Corridoio")
+    # Definiamo l'insieme degli ID corridoio
+    corridor_ids = {c.id for c in results["corridoi"]}
+    # Calcola la frequenza degli archi, considerando solo quelli in cui entrambi i nodi sono corridoi,
+    # utilizzando i percorsi minimi calcolati tra macchine (results["percorsi_macchine"])
+    edge_freq_corridor = {}
+    for (m1, m2), info in results["percorsi_macchine"].items():
+        path = info["path"]
+        if path is None:
+            continue
+        # Per ogni coppia consecutiva, se entrambi i nodi sono corridoi, aggiungili al conteggio
+        for i in range(len(path) - 1):
+            if path[i] in corridor_ids and path[i+1] in corridor_ids:
+                edge = (path[i], path[i+1])
+                edge_freq_corridor[edge] = edge_freq_corridor.get(edge, 0) + 1
+
+    # Costruiamo un grafo per le frequenze solo dei nodi corridoio
     freq_graph = nx.DiGraph()
-    for (src, dst), freq in edge_freq.items():
-        freq_graph.add_edge(src, dst, frequency=freq)
-    # Imposta le posizioni usando quelle dei nodi presenti nel grafo G (assumiamo che le macchine siano in G)
+    # Aggiungiamo i nodi corridoio dal grafo originale
+    for node in G.nodes():
+        if node in corridor_ids:
+            freq_graph.add_node(node, punto=G.nodes[node]['punto'])
+    # Aggiungiamo gli archi con la frequenza
+    for (src, dst), freq in edge_freq_corridor.items():
+        if src in freq_graph.nodes() and dst in freq_graph.nodes():
+            freq_graph.add_edge(src, dst, frequency=freq)
+    # Posizioni: usa le stesse del grafo originale per i nodi corridoio
     pos_freq = {}
     for node in freq_graph.nodes():
-        if node in G.nodes():
-            punto = G.nodes[node]['punto']
-            pos_freq[node] = (punto.x, punto.y)
-        else:
-            pos_freq[node] = (0, 0)  # fallback
-
+        pos_freq[node] = (G.nodes[node]['punto'].x, G.nodes[node]['punto'].y)
+    
     fig_freq, ax_freq = plt.subplots(figsize=(8, 6))
-    # Disegna i nodi
-    nx.draw_networkx_nodes(freq_graph, pos_freq, node_color='red', node_size=600, ax=ax_freq)
-    # Imposta lo spessore degli archi in base alla frequenza (scalando il valore, ad esempio, moltiplicando per 1.5)
+    nx.draw_networkx_nodes(freq_graph, pos_freq, node_color='blue', node_size=400, ax=ax_freq)
+    # Larghezza degli archi in base alla frequenza (scalata, ad esempio, per rendere più evidente)
     edge_widths = [freq_graph[u][v]['frequency'] * 1.5 for u, v in freq_graph.edges()]
     nx.draw_networkx_edges(freq_graph, pos_freq, ax=ax_freq, width=edge_widths, arrowstyle='->', arrowsize=15)
     nx.draw_networkx_labels(freq_graph, pos_freq, ax=ax_freq)
-    # Disegna le etichette degli archi con il valore della frequenza
     edge_labels = {(u, v): freq_graph[u][v]['frequency'] for u, v in freq_graph.edges()}
     nx.draw_networkx_edge_labels(freq_graph, pos_freq, edge_labels=edge_labels, ax=ax_freq)
     
-    ax_freq.set_title("Frequenza di utilizzo degli archi negli ordini")
+    ax_freq.set_title("Frequenza di utilizzo degli archi (solo corridoi)")
     ax_freq.set_xlabel("Coordinata X")
     ax_freq.set_ylabel("Coordinata Y")
     ax_freq.axis('equal')
     ax_freq.grid(True)
     st.pyplot(fig_freq)
     
-    # Salva i risultati nello stato della sessione per renderli accessibili in altre pagine
+    # Salva i risultati aggiornati nello stato della sessione
     st.session_state["computed_results"] = {
         "percorsi_macchine": results["percorsi_macchine"],
         "excel_data": results["excel_data"],
@@ -149,7 +155,8 @@ else:
         "macchine": results["macchine"],
         "corridoi": results["corridoi"],
         "orders": orders,
-        "edge_frequency": edge_freq
+        "edge_frequency": edge_freq_corridor
     }
+
 
 
