@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import pandas as pd
 import streamlit as st
-from io import StringIO
+from io import StringIO, BytesIO
 
 ###############################
 # 1. Classe Punto e Funzioni Ausiliarie
@@ -89,7 +89,9 @@ def costruisci_grafo_from_data(macchine_list, corridoi_list):
     return G
 
 def calcola_percorsi_macchine(G, macchine_list):
-    """Calcola il percorso minimo tra ogni coppia di macchine usando Dijkstra."""
+    """Calcola il percorso minimo tra ogni coppia di macchine usando Dijkstra.
+       Il percorso restituito è una lista completa di nodi (macchine e corridoi) attraversati.
+    """
     percorsi_macchine = {}
     n = len(macchine_list)
     for i in range(n):
@@ -148,7 +150,33 @@ def disegna_grafo(G, background_img=None, extent=None):
     return fig
 
 ###############################
-# 4. App Streamlit: Import da File e Visualizzazione
+# 4. Funzione per Generare il File Excel Riassuntivo
+###############################
+
+def genera_excel(percorsi_macchine):
+    """
+    Genera un file Excel (in memoria) con una riga per ogni coppia di macchine,
+    contenente le colonne: Machine1, Machine2, Path e Distance.
+    Il campo "Path" contiene tutti i punti (macchine e corridoi) attraversati.
+    """
+    rows = []
+    for (m1, m2), info in percorsi_macchine.items():
+        rows.append({
+            "Machine1": m1,
+            "Machine2": m2,
+            "Path": " -> ".join(info["path"]) if info["path"] is not None else None,
+            "Distance": info["distance"]
+        })
+    df = pd.DataFrame(rows)
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="Connections")
+        writer.save()
+    processed_data = output.getvalue()
+    return processed_data
+
+###############################
+# 5. App Streamlit: Import da File, Esempi, Visualizzazione e Download Excel
 ###############################
 
 st.title("Analisi di Scenari - Grafici per Macchine e Corridoi")
@@ -158,9 +186,26 @@ Carica un file Excel o CSV per lo scenario.
 **Requisiti:**  
 - Per Excel: il file deve contenere due fogli/tabelle chiamati **"macchine"** e **"corridoi"**.  
 - Per CSV: carica separatamente due file (uno per macchine e uno per corridoi) con nomi **macchine** e **corridoi**.
-  
+
 Se non carichi alcun file, verranno usati i dati di default.
 """)
+
+# Mostra a schermo degli esempi di file CSV
+st.subheader("Esempio di file CSV per 'macchine'")
+default_macchine_csv = """id,x,y
+M1,10,20
+M2,15,25
+M3,30,40
+"""
+st.code(default_macchine_csv, language='csv')
+
+st.subheader("Esempio di file CSV per 'corridoi'")
+default_corridoi_csv = """id,x,y,preferred_direction
+C1,5,5,0
+C2,12,18,1.57
+C3,25,30,0.78
+"""
+st.code(default_corridoi_csv, language='csv')
 
 # Caricamento file per scenario
 uploaded_excel = st.file_uploader("Carica file Excel", type=["xlsx"], key="excel")
@@ -201,7 +246,6 @@ if uploaded_excel is not None:
             df_corridoi = sheets["corridoi"]
             st.success("File Excel caricato correttamente.")
             
-            # Elaborazione dei dati per macchine
             for _, row in df_macchine.iterrows():
                 try:
                     m = Punto(
@@ -214,7 +258,6 @@ if uploaded_excel is not None:
                 except Exception as e:
                     st.error(f"Errore nella riga delle macchine: {e}")
                     
-            # Elaborazione dei dati per corridoi
             for _, row in df_corridoi.iterrows():
                 try:
                     pd_val = row.get("preferred_direction", None)
@@ -273,16 +316,6 @@ elif uploaded_csv_macchine is not None and uploaded_csv_corridoi is not None:
 # Se nessun file è stato caricato, uso i dati di default
 if not macchine_list or not corridoi_list:
     st.info("Nessun file caricato. Utilizzo dei dati di default.")
-    default_macchine_csv = """id,x,y
-M1,10,20
-M2,15,25
-M3,30,40
-"""
-    default_corridoi_csv = """id,x,y,preferred_direction
-C1,5,5,0
-C2,12,18,1.57
-C3,25,30,0.78
-"""
     df_macchine = pd.read_csv(StringIO(default_macchine_csv))
     df_corridoi = pd.read_csv(StringIO(default_corridoi_csv))
     
@@ -327,9 +360,18 @@ else:
     for key, info in percorsi_macchine.items():
         m1, m2 = key
         st.markdown(f"**Percorso da {m1} a {m2}:**")
-        st.write(f"Path: {info['path']}")
+        st.write(f"Path: {' -> '.join(info['path']) if info['path'] is not None else 'Nessun percorso'}")
         st.write(f"Distanza totale: {info['distance']:.2f}")
 
     st.subheader("Grafico del Grafo")
     fig = disegna_grafo(G, background_img=background_img, extent=extent)
     st.pyplot(fig)
+    
+    # Genera il file Excel riassuntivo e abilita il download
+    excel_data = genera_excel(percorsi_macchine)
+    st.download_button(
+        label="Scarica file Excel con i collegamenti",
+        data=excel_data,
+        file_name="machine_connections.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
