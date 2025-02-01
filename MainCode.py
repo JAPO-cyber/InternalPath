@@ -8,17 +8,16 @@ from io import StringIO, BytesIO
 
 """
 ======================================
-CONFIGURAZIONE DEI PERCORSI STANDARD
+CONFIGURAZIONE DEI PERCORSI STANDARD - PAGINA 1
 ======================================
 
-Questo modulo contiene la configurazione iniziale dei percorsi:
+Questa pagina rappresenta la configurazione iniziale dei percorsi.
 - Definizione della classe Punto e delle funzioni ausiliarie.
 - Costruzione del grafo basato sui punti (macchine e corridoi).
 - Calcolo dei percorsi minimi (inclusi tutti i punti corridoio attraversati).
 - Generazione del file Excel riassuntivo e visualizzazione del grafo.
 
-I risultati calcolati vengono salvati nello stato della sessione 
-(variabile st.session_state["computed_results"]) per poter essere utilizzati in altre pagine.
+I risultati verranno salvati in st.session_state["computed_results"] per poterli utilizzare in altre pagine.
 """
 
 ###############################
@@ -190,21 +189,21 @@ def genera_excel(percorsi_macchine):
     return processed_data
 
 ###############################
-# 5. App Streamlit: Esempi CSV, Import da File, Visualizzazione, Download Excel e Salvataggio Output in Session State
+# 5. Pagina 1: Import, Esempi CSV, Elaborazione e Salvataggio Risultati
 ###############################
 
-st.title("Analisi di Scenari - Grafici per Macchine e Corridoi")
+st.title("Configurazione dei Percorsi - Pagina 1")
 
 st.markdown("""
-Carica un file Excel o CSV per lo scenario.  
-**Requisiti:**  
-- Per Excel: il file deve contenere due fogli/tabelle chiamati **"macchine"** e **"corridoi"**.  
+Carica un file Excel o CSV per lo scenario.
+**Requisiti:**
+- Per Excel: il file deve contenere due fogli/tabelle chiamati **"macchine"** e **"corridoi"**.
 - Per CSV: carica separatamente due file (uno per macchine e uno per corridoi) con nomi **macchine** e **corridoi**.
 
 Se non carichi alcun file, verranno usati i dati di default.
 """)
 
-# --- Sezione: Download Esempi CSV ---
+# --- Esempi CSV e Download ---
 st.subheader("Esempi di file CSV di partenza")
 default_macchine_csv = """id,x,y
 A1_M1,10,20
@@ -245,12 +244,12 @@ st.download_button(
     mime="text/csv"
 )
 
-# --- Sezione: Caricamento File ---
+# --- Caricamento File ---
 uploaded_excel = st.file_uploader("Carica file Excel", type=["xlsx"], key="excel")
 uploaded_csv_macchine = st.file_uploader("Carica CSV per macchine", type=["csv"], key="csv_macchine")
 uploaded_csv_corridoi = st.file_uploader("Carica CSV per corridoi", type=["csv"], key="csv_corridoi")
 
-# --- Sezione: Opzionale, Immagine Layout ---
+# --- Opzionale: Immagine Layout ---
 st.markdown("---")
 st.subheader("Opzionale: Carica immagine del layout della fabbrica")
 uploaded_img = st.file_uploader("Carica un'immagine", type=["png", "jpg", "jpeg"], key="img")
@@ -266,7 +265,7 @@ if uploaded_img is not None:
     ymax = st.number_input("ymax", value=50.0, key="ymax")
     extent = [xmin, xmax, ymin, ymax]
 
-# --- Sezione: Elaborazione Dati ---
+# --- Elaborazione Dati ---
 macchine_list = []
 corridoi_list = []
 
@@ -380,7 +379,7 @@ if not macchine_list or not corridoi_list:
         except Exception as e:
             st.error(f"Errore nella riga dei corridoi (default): {e}")
 
-# --- Sezione: Elaborazione e Visualizzazione ---
+# --- Elaborazione e Visualizzazione ---
 if not macchine_list or not corridoi_list:
     st.error("Dati insufficienti per costruire il grafo.")
 else:
@@ -416,3 +415,4 @@ else:
         "macchine": macchine_list,
         "corridoi": corridoi_list
     }
+
