@@ -78,7 +78,7 @@ else:
     for i in range(1, 51):
         n = random.randint(3, 5)  # numero casuale di macchine per l'ordine (da 3 a 5)
         selected = random.sample(machine_ids, n)
-        # Calcola la distanza totale per questo ordine, sommando la distanza per ogni coppia consecutiva
+        breakdown_list = []  # Lista per memorizzare i valori delle distanze per ogni coppia
         total_distance = 0
         for j in range(len(selected) - 1):
             try:
@@ -86,9 +86,12 @@ else:
             except nx.NetworkXNoPath:
                 d = float('inf')
             total_distance += d
+            # Arrotondiamo il valore a 2 decimali e lo aggiungiamo alla lista di breakdown
+            breakdown_list.append(f"{d:.2f}")
         orders.append({
             "Ordine": f"Ordine {i}",
             "Path": " -> ".join(selected),
+            "Breakdown": " + ".join(breakdown_list),
             "Distance (m)": round(total_distance, 2)
         })
     
