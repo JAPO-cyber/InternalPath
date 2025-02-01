@@ -6,6 +6,21 @@ import pandas as pd
 import streamlit as st
 from io import StringIO, BytesIO
 
+"""
+======================================
+CONFIGURAZIONE DEI PERCORSI STANDARD
+======================================
+
+Questo modulo contiene la configurazione iniziale dei percorsi:
+- Definizione della classe Punto e delle funzioni ausiliarie.
+- Costruzione del grafo basato sui punti (macchine e corridoi).
+- Calcolo dei percorsi minimi (inclusi tutti i punti corridoio attraversati).
+- Generazione del file Excel riassuntivo e visualizzazione del grafo.
+
+I risultati calcolati vengono salvati nello stato della sessione 
+(variabile st.session_state["computed_results"]) per poter essere utilizzati in altre pagine.
+"""
+
 ###############################
 # 1. Classe Punto e Funzioni Ausiliarie
 ###############################
@@ -171,12 +186,11 @@ def genera_excel(percorsi_macchine):
     output = BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
         df.to_excel(writer, index=False, sheet_name="Connections")
-        # Non è necessario chiamare writer.save() qui
     processed_data = output.getvalue()
     return processed_data
 
 ###############################
-# 5. App Streamlit: Esempi CSV, Import da File, Visualizzazione e Download Excel
+# 5. App Streamlit: Esempi CSV, Import da File, Visualizzazione, Download Excel e Salvataggio Output in Session State
 ###############################
 
 st.title("Analisi di Scenari - Grafici per Macchine e Corridoi")
@@ -393,3 +407,12 @@ else:
         file_name="machine_connections.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+    
+    # Salva i risultati nello stato della sessione per renderli accessibili in altre pagine
+    st.session_state["computed_results"] = {
+        "percorsi_macchine": percorsi_macchine,
+        "excel_data": excel_data,
+        "graph": G,
+        "macchine": macchine_list,
+        "corridoi": corridoi_list
+    }
