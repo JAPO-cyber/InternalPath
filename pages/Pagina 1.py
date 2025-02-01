@@ -45,6 +45,7 @@ else:
                 node_sizes.append(300)
         fig, ax = plt.subplots(figsize=(8, 6))
         nx.draw(G, pos, with_labels=True, node_color=node_colors, node_size=node_sizes, font_weight='bold', ax=ax)
+        # Disegna le etichette degli archi (opzionale)
         edge_labels = nx.get_edge_attributes(G, 'weight')
         edge_labels = {edge: f"{weight:.2f}" for edge, weight in edge_labels.items()}
         nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, ax=ax)
@@ -77,9 +78,18 @@ else:
     for i in range(1, 51):
         n = random.randint(3, 5)  # numero casuale di macchine per l'ordine (da 3 a 5)
         selected = random.sample(machine_ids, n)
+        # Calcola la distanza totale per questo ordine, sommando la distanza per ogni coppia consecutiva
+        total_distance = 0
+        for j in range(len(selected) - 1):
+            try:
+                d = nx.dijkstra_path_length(G, selected[j], selected[j+1], weight='weight')
+            except nx.NetworkXNoPath:
+                d = float('inf')
+            total_distance += d
         orders.append({
             "Ordine": f"Ordine {i}",
-            "Path": " -> ".join(selected)
+            "Path": " -> ".join(selected),
+            "Distance (m)": round(total_distance, 2)
         })
     
     df_orders = pd.DataFrame(orders)
