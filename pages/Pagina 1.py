@@ -29,6 +29,7 @@ else:
     # --- Sezione: Visualizzazione del Grafo Completo ---
     st.subheader("Grafico del Grafo Completo")
     G = results["graph"]
+
     def disegna_grafo(G):
         pos = {}
         node_colors = []
@@ -68,17 +69,16 @@ else:
 
     # --- Sezione: Generazione degli Ordini di Processo ---
     st.subheader("Ordini di Processo")
-    # Estrae gli ID delle macchine dai risultati (assumiamo che "macchine" sia una lista di oggetti Punto)
     machine_ids = [m.id for m in results["macchine"]]
     
     orders = []
-    # Per generare una data casuale, definiamo l'intervallo
+    # Definisci l'intervallo di date per generare date casuali
     start_date = datetime(2023, 1, 1)
     end_date = datetime(2023, 12, 31)
     delta_days = (end_date - start_date).days
 
     for i in range(1, 51):
-        n = random.randint(3, 5)  # numero casuale di macchine per l'ordine (da 3 a 5)
+        n = random.randint(3, 5)
         selected = random.sample(machine_ids, n)
         breakdown_list = []
         total_distance = 0
@@ -89,7 +89,7 @@ else:
                 d = float('inf')
             total_distance += d
             breakdown_list.append(f"{d:.2f}")
-        # Genera una data casuale all'interno dell'intervallo
+        # Genera una data casuale nell'intervallo
         random_days = random.randint(0, delta_days)
         order_date = start_date + timedelta(days=random_days)
         orders.append({
@@ -110,27 +110,26 @@ else:
         mime="text/csv"
     )
     
-    # --- Sezione: Filtro per Data ---
+    # --- Sezione: Filtro per Data con Tasto "Annulla Filtro" ---
     st.subheader("Filtro Ordini per Data")
-    # Imposta il range di date come valori di default
     default_range = [start_date.date(), end_date.date()]
     selected_range = st.date_input("Seleziona intervallo di date", default_range)
-    if isinstance(selected_range, tuple) or isinstance(selected_range, list):
-        filter_start, filter_end = selected_range
+    # Pulsante per annullare il filtro
+    if st.button("Annulla Filtro"):
+        df_filtered = df_orders.copy()
     else:
-        filter_start = filter_end = selected_range
-
-    # Filtra gli ordini in base alla data selezionata
-    df_orders["Date"] = pd.to_datetime(df_orders["Date"])
-    df_filtered = df_orders[(df_orders["Date"] >= pd.to_datetime(filter_start)) & (df_orders["Date"] <= pd.to_datetime(filter_end))]
+        if isinstance(selected_range, (tuple, list)):
+            filter_start, filter_end = selected_range
+        else:
+            filter_start = filter_end = selected_range
+        df_orders["Date"] = pd.to_datetime(df_orders["Date"])
+        df_filtered = df_orders[(df_orders["Date"] >= pd.to_datetime(filter_start)) & (df_orders["Date"] <= pd.to_datetime(filter_end))]
     st.write("Ordini filtrati:")
     st.dataframe(df_filtered)
     
-    # --- Sezione: Grafico Frequenze degli Archi Utilizzati tra Punti Corridoio (solo per gli ordini filtrati) ---
+    # --- Sezione: Grafico Frequenze degli Archi Utilizzati tra Punti Corridoio (solo per ordini filtrati) ---
     st.subheader("Grafico Frequenze: Solo Punti Corridoio (Ordini Filtrati)")
-    # Definisci l'insieme degli ID corridoio
     corridor_ids = {c.id for c in results["corridoi"]}
-    # Calcola la frequenza degli archi usando solo gli ordini filtrati
     edge_freq_corridor = {}
     for _, order in df_filtered.iterrows():
         path_nodes = order["Path"].split(" -> ")
@@ -139,7 +138,6 @@ else:
                 edge = (path_nodes[i], path_nodes[i+1])
                 edge_freq_corridor[edge] = edge_freq_corridor.get(edge, 0) + 1
 
-    # Crea un grafo per le frequenze (solo nodi corridoio)
     freq_graph = nx.DiGraph()
     for node in G.nodes():
         if node in corridor_ids:
@@ -174,7 +172,5 @@ else:
         "orders": orders,
         "edge_frequency": edge_freq_corridor
     }
-
-
 
 
