@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import pandas as pd
 import streamlit as st
+from io import StringIO
 
 ###############################
 # 1. Classe Punto e Funzioni Ausiliarie
@@ -51,7 +52,6 @@ def costruisci_grafo_from_data(macchine_list, corridoi_list):
     macchine_list e corridoi_list sono liste di oggetti Punto.
     Se almeno un corridoio ha preferred_direction diverso da None, utilizziamo un grafo diretto.
     """
-    # Scegliamo il tipo di grafo
     usa_direzionato = any(c.preferred_direction is not None for c in corridoi_list)
     if usa_direzionato:
         G = nx.DiGraph()
@@ -69,12 +69,9 @@ def costruisci_grafo_from_data(macchine_list, corridoi_list):
         corridoio_vicino, distanza_min = min(distanze, key=lambda x: x[1])
         # Aggiungiamo l'arco dalla macchina al corridoio
         G.add_edge(m.id, corridoio_vicino.id, weight=distanza_min)
-        # Se il grafo è diretto, aggiungiamo anche il collegamento inverso senza penalità (se ritenuto opportuno)
+        # Se il grafo è diretto, aggiungiamo anche il collegamento inverso senza penalità
         if usa_direzionato:
             G.add_edge(corridoio_vicino.id, m.id, weight=distanza_min)
-        else:
-            # In grafo non diretto, l'arco è unico.
-            pass
         
     # Collegamenti tra corridoi:
     for i, c1 in enumerate(corridoi_list):
@@ -82,12 +79,10 @@ def costruisci_grafo_from_data(macchine_list, corridoi_list):
             if c1.id == c2.id:
                 continue
             base_weight = euclidean_distance(c1, c2)
-            # Se il grafo è diretto, calcoliamo il peso con la penalità in base al verso preferenziale di c1
             if usa_direzionato:
                 adjusted_weight = adjust_weight_for_preferred_direction(c1, c1, c2, base_weight)
                 G.add_edge(c1.id, c2.id, weight=adjusted_weight)
             else:
-                # In un grafo non diretto, usiamo semplicemente la distanza
                 if not G.has_edge(c1.id, c2.id):
                     G.add_edge(c1.id, c2.id, weight=base_weight)
                     
@@ -130,7 +125,6 @@ def disegna_grafo(G, background_img=None, extent=None):
     if background_img is not None and extent is not None:
         ax.imshow(background_img, extent=extent, aspect='auto', alpha=0.5)
     
-    # Per grafo diretto usiamo frecce
     if isinstance(G, nx.DiGraph):
         nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=600, ax=ax)
         nx.draw_networkx_labels(G, pos, ax=ax)
@@ -150,31 +144,28 @@ def disegna_grafo(G, background_img=None, extent=None):
     return fig
 
 ###############################
-# 4. App Streamlit: Import da Excel e Visualizzazione
+# 4. App Streamlit: Import da File e Visualizzazione
 ###############################
 
 st.title("Analisi di Scenari - Grafici per Macchine e Corridoi")
 
 st.markdown("""
-Carica uno o più file Excel.  
+Carica un file Excel o CSV per lo scenario.  
 **Requisiti:**  
-- Ogni file deve contenere due sheet (o tabelle) chiamati **"macchine"** e **"corridoi"**.  
-- Nel sheet **macchine** devono esserci almeno le colonne:  
-  - `id` (identificativo)  
-  - `x` (coordinata X)  
-  - `y` (coordinata Y)  
-- Nel sheet **corridoi** devono esserci almeno le colonne:  
-  - `id`  
-  - `x`  
-  - `y`  
-  - (opzionale) `preferred_direction` (in radianti, es. 0, 1.57, ecc.)
+- Per Excel: il file deve contenere due fogli/tabelle chiamati **"macchine"** e **"corridoi"**.  
+- Per CSV: carica separatamente due file (uno per macchine e uno per corridoi) con nomi **macchine** e **corridoi**.
+  
+Se non carichi alcun file, verranno usati i dati di default.
 """)
 
-uploaded_files = st.file_uploader("Carica file Excel", type=["xlsx"], accept_multiple_files=True)
+# Caricamento file per scenario
+uploaded_excel = st.file_uploader("Carica file Excel", type=["xlsx"], key="excel")
+uploaded_csv_macchine = st.file_uploader("Carica CSV per macchine", type=["csv"], key="csv_macchine")
+uploaded_csv_corridoi = st.file_uploader("Carica CSV per corridoi", type=["csv"], key="csv_corridoi")
 
-# Opzionale: carica un'immagine di background (layout della fabbrica)
+# Opzionale: Caricamento immagine del layout della fabbrica
 st.markdown("---")
-st.subheader("Opzionale: Carica l'immagine del layout della fabbrica")
+st.subheader("Opzionale: Carica immagine del layout della fabbrica")
 uploaded_img = st.file_uploader("Carica un'immagine", type=["png", "jpg", "jpeg"], key="img")
 background_img = None
 extent = None
@@ -188,31 +179,62 @@ if uploaded_img is not None:
     ymax = st.number_input("ymax", value=50.0, key="ymax")
     extent = [xmin, xmax, ymin, ymax]
 
-if uploaded_files:
-    for file in uploaded_files:
-        st.markdown("---")
-        st.markdown(f"### Scenario: {file.name}")
-        
-        try:
-            # Leggiamo tutti i sheet del file Excel
-            sheets = pd.read_excel(file, sheet_name=None)
-        except Exception as e:
-            st.error(f"Errore nella lettura del file: {e}")
-            continue
-        
-        # Controlliamo se sono presenti i fogli "macchine" e "corridoi"
+# Variabili per contenere i dati
+macchine_list = []
+corridoi_list = []
+
+# Se è stato caricato un file Excel, lo usiamo
+if uploaded_excel is not None:
+    try:
+        sheets = pd.read_excel(uploaded_excel, sheet_name=None)
+    except Exception as e:
+        st.error(f"Errore nella lettura del file Excel: {e}")
+    else:
         if "macchine" not in sheets or "corridoi" not in sheets:
-            st.error("Il file deve contenere i fogli 'macchine' e 'corridoi'.")
-            continue
+            st.error("Il file Excel deve contenere i fogli 'macchine' e 'corridoi'.")
+        else:
+            df_macchine = sheets["macchine"]
+            df_corridoi = sheets["corridoi"]
+            st.success("File Excel caricato correttamente.")
+            
+            # Elaborazione dei dati per macchine
+            for _, row in df_macchine.iterrows():
+                try:
+                    m = Punto(
+                        x=float(row["x"]),
+                        y=float(row["y"]),
+                        categoria="macchina",
+                        id=str(row["id"])
+                    )
+                    macchine_list.append(m)
+                except Exception as e:
+                    st.error(f"Errore nella riga delle macchine: {e}")
+                    
+            # Elaborazione dei dati per corridoi
+            for _, row in df_corridoi.iterrows():
+                try:
+                    pd_val = row.get("preferred_direction", None)
+                    pref_dir = None
+                    if pd_val is not None and not pd.isna(pd_val):
+                        pref_dir = float(pd_val)
+                    c = Punto(
+                        x=float(row["x"]),
+                        y=float(row["y"]),
+                        categoria="corridoio",
+                        id=str(row["id"]),
+                        preferred_direction=pref_dir
+                    )
+                    corridoi_list.append(c)
+                except Exception as e:
+                    st.error(f"Errore nella riga dei corridoi: {e}")
+
+# Se non sono stati caricati file Excel, proviamo con CSV
+elif uploaded_csv_macchine is not None and uploaded_csv_corridoi is not None:
+    try:
+        df_macchine = pd.read_csv(uploaded_csv_macchine)
+        df_corridoi = pd.read_csv(uploaded_csv_corridoi)
+        st.success("File CSV caricati correttamente.")
         
-        # Creiamo le liste di oggetti Punto per macchine e corridoi
-        df_macchine = sheets["macchine"]
-        df_corridoi = sheets["corridoi"]
-        
-        macchine_list = []
-        corridoi_list = []
-        
-        # Assumiamo che le colonne siano nominate: id, x, y, (preferred_direction per i corridoi)
         for _, row in df_macchine.iterrows():
             try:
                 m = Punto(
@@ -227,7 +249,6 @@ if uploaded_files:
                 
         for _, row in df_corridoi.iterrows():
             try:
-                # Se la colonna preferred_direction esiste e non è NaN, la convertiamo in float, altrimenti None
                 pd_val = row.get("preferred_direction", None)
                 pref_dir = None
                 if pd_val is not None and not pd.isna(pd_val):
@@ -242,27 +263,71 @@ if uploaded_files:
                 corridoi_list.append(c)
             except Exception as e:
                 st.error(f"Errore nella riga dei corridoi: {e}")
-        
-        # Se non sono stati creati dati sufficienti, saltiamo lo scenario
-        if not macchine_list or not corridoi_list:
-            st.error("Dati insufficienti per costruire il grafo.")
-            continue
-        
-        # Costruiamo il grafo a partire dai dati importati
-        G = costruisci_grafo_from_data(macchine_list, corridoi_list)
-        percorsi_macchine = calcola_percorsi_macchine(G, macchine_list)
-        
-        # Visualizziamo i percorsi calcolati
-        st.subheader("Percorsi minimi fra macchine")
-        for key, info in percorsi_macchine.items():
-            m1, m2 = key
-            st.markdown(f"**Percorso da {m1} a {m2}:**")
-            st.write(f"Path: {info['path']}")
-            st.write(f"Distanza totale: {info['distance']:.2f}")
-        
-        # Disegniamo il grafo e lo visualizziamo
-        st.subheader("Grafico del Grafo")
-        fig = disegna_grafo(G, background_img=background_img, extent=extent)
-        st.pyplot(fig)
+    except Exception as e:
+        st.error(f"Errore nella lettura dei file CSV: {e}")
+
+# Se nessun file è stato caricato, uso i dati di default
+if not macchine_list or not corridoi_list:
+    st.info("Nessun file caricato. Utilizzo dei dati di default.")
+    default_macchine_csv = """id,x,y
+M1,10,20
+M2,15,25
+M3,30,40
+"""
+    default_corridoi_csv = """id,x,y,preferred_direction
+C1,5,5,0
+C2,12,18,1.57
+C3,25,30,0.78
+"""
+    df_macchine = pd.read_csv(StringIO(default_macchine_csv))
+    df_corridoi = pd.read_csv(StringIO(default_corridoi_csv))
+    
+    for _, row in df_macchine.iterrows():
+        try:
+            m = Punto(
+                x=float(row["x"]),
+                y=float(row["y"]),
+                categoria="macchina",
+                id=str(row["id"])
+            )
+            macchine_list.append(m)
+        except Exception as e:
+            st.error(f"Errore nella riga delle macchine (default): {e}")
+                
+    for _, row in df_corridoi.iterrows():
+        try:
+            pd_val = row.get("preferred_direction", None)
+            pref_dir = None
+            if pd_val is not None and not pd.isna(pd_val):
+                pref_dir = float(pd_val)
+            c = Punto(
+                x=float(row["x"]),
+                y=float(row["y"]),
+                categoria="corridoio",
+                id=str(row["id"]),
+                preferred_direction=pref_dir
+            )
+            corridoi_list.append(c)
+        except Exception as e:
+            st.error(f"Errore nella riga dei corridoi (default): {e}")
+
+# Verifica che ci siano dati sufficienti
+if not macchine_list or not corridoi_list:
+    st.error("Dati insufficienti per costruire il grafo.")
+else:
+    # Costruzione del grafo e calcolo dei percorsi
+    G = costruisci_grafo_from_data(macchine_list, corridoi_list)
+    percorsi_macchine = calcola_percorsi_macchine(G, macchine_list)
+
+    st.subheader("Percorsi minimi fra macchine")
+    for key, info in percorsi_macchine.items():
+        m1, m2 = key
+        st.markdown(f"**Percorso da {m1} a {m2}:**")
+        st.write(f"Path: {info['path']}")
+        st.write(f"Distanza totale: {info['distance']:.2f}")
+
+    st.subheader("Grafico del Grafo")
+    fig = disegna_grafo(G, background_img=background_img, extent=extent)
+    st.pyplot(fig)
 
 
