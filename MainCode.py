@@ -176,7 +176,7 @@ def genera_excel(percorsi_macchine):
     return processed_data
 
 ###############################
-# 5. App Streamlit: Import da File, Esempi, Visualizzazione e Download Excel
+# 5. App Streamlit: Esempi CSV, Import da File, Visualizzazione e Download Excel
 ###############################
 
 st.title("Analisi di Scenari - Grafici per Macchine e Corridoi")
@@ -190,29 +190,53 @@ Carica un file Excel o CSV per lo scenario.
 Se non carichi alcun file, verranno usati i dati di default.
 """)
 
-# Mostra a schermo degli esempi di file CSV
-st.subheader("Esempio di file CSV per 'macchine'")
+# --- Sezione: Download Esempi CSV ---
+st.subheader("Esempi di file CSV di partenza")
 default_macchine_csv = """id,x,y
-M1,10,20
-M2,15,25
-M3,30,40
+A1_M1,10,20
+A1_M2,10,30
+A1_M3,20,20
+A1_M4,20,30
+A2_M1,40,20
+A2_M2,40,30
+A2_M3,50,20
+A2_M4,50,30
+A3_M1,70,20
+A3_M2,70,30
+A3_M3,80,20
+A3_M4,80,30
 """
-st.code(default_macchine_csv, language='csv')
-
-st.subheader("Esempio di file CSV per 'corridoi'")
 default_corridoi_csv = """id,x,y,preferred_direction
-C1,5,5,0
-C2,12,18,1.57
-C3,25,30,0.78
+C1,0,25,0
+C2,30,25,0
+C3,60,25,0
+C4,90,25,3.1416
+C5,45,35,1.5708
+C6,45,15,-1.5708
 """
+st.markdown("#### File CSV per le macchine")
+st.code(default_macchine_csv, language='csv')
+st.download_button(
+    label="Scarica macchine.csv",
+    data=default_macchine_csv,
+    file_name="macchine.csv",
+    mime="text/csv"
+)
+st.markdown("#### File CSV per i corridoi")
 st.code(default_corridoi_csv, language='csv')
+st.download_button(
+    label="Scarica corridoi.csv",
+    data=default_corridoi_csv,
+    file_name="corridoi.csv",
+    mime="text/csv"
+)
 
-# Caricamento file per scenario
+# --- Sezione: Caricamento File ---
 uploaded_excel = st.file_uploader("Carica file Excel", type=["xlsx"], key="excel")
 uploaded_csv_macchine = st.file_uploader("Carica CSV per macchine", type=["csv"], key="csv_macchine")
 uploaded_csv_corridoi = st.file_uploader("Carica CSV per corridoi", type=["csv"], key="csv_corridoi")
 
-# Opzionale: Caricamento immagine del layout della fabbrica
+# --- Sezione: Opzionale, Immagine Layout ---
 st.markdown("---")
 st.subheader("Opzionale: Carica immagine del layout della fabbrica")
 uploaded_img = st.file_uploader("Carica un'immagine", type=["png", "jpg", "jpeg"], key="img")
@@ -223,12 +247,12 @@ if uploaded_img is not None:
     st.image(background_img, caption="Layout della fabbrica", use_column_width=True)
     st.markdown("**Imposta l'estensione dell'immagine:**")
     xmin = st.number_input("xmin", value=0.0, key="xmin")
-    xmax = st.number_input("xmax", value=40.0, key="xmax")
+    xmax = st.number_input("xmax", value=100.0, key="xmax")
     ymin = st.number_input("ymin", value=0.0, key="ymin")
     ymax = st.number_input("ymax", value=50.0, key="ymax")
     extent = [xmin, xmax, ymin, ymax]
 
-# Variabili per contenere i dati
+# --- Sezione: Elaborazione Dati ---
 macchine_list = []
 corridoi_list = []
 
@@ -245,7 +269,6 @@ if uploaded_excel is not None:
             df_macchine = sheets["macchine"]
             df_corridoi = sheets["corridoi"]
             st.success("File Excel caricato correttamente.")
-            
             for _, row in df_macchine.iterrows():
                 try:
                     m = Punto(
@@ -257,7 +280,6 @@ if uploaded_excel is not None:
                     macchine_list.append(m)
                 except Exception as e:
                     st.error(f"Errore nella riga delle macchine: {e}")
-                    
             for _, row in df_corridoi.iterrows():
                 try:
                     pd_val = row.get("preferred_direction", None)
@@ -281,7 +303,6 @@ elif uploaded_csv_macchine is not None and uploaded_csv_corridoi is not None:
         df_macchine = pd.read_csv(uploaded_csv_macchine)
         df_corridoi = pd.read_csv(uploaded_csv_corridoi)
         st.success("File CSV caricati correttamente.")
-        
         for _, row in df_macchine.iterrows():
             try:
                 m = Punto(
@@ -293,7 +314,6 @@ elif uploaded_csv_macchine is not None and uploaded_csv_corridoi is not None:
                 macchine_list.append(m)
             except Exception as e:
                 st.error(f"Errore nella riga delle macchine: {e}")
-                
         for _, row in df_corridoi.iterrows():
             try:
                 pd_val = row.get("preferred_direction", None)
@@ -318,7 +338,6 @@ if not macchine_list or not corridoi_list:
     st.info("Nessun file caricato. Utilizzo dei dati di default.")
     df_macchine = pd.read_csv(StringIO(default_macchine_csv))
     df_corridoi = pd.read_csv(StringIO(default_corridoi_csv))
-    
     for _, row in df_macchine.iterrows():
         try:
             m = Punto(
@@ -330,7 +349,6 @@ if not macchine_list or not corridoi_list:
             macchine_list.append(m)
         except Exception as e:
             st.error(f"Errore nella riga delle macchine (default): {e}")
-                
     for _, row in df_corridoi.iterrows():
         try:
             pd_val = row.get("preferred_direction", None)
@@ -348,7 +366,7 @@ if not macchine_list or not corridoi_list:
         except Exception as e:
             st.error(f"Errore nella riga dei corridoi (default): {e}")
 
-# Verifica che ci siano dati sufficienti e visualizza
+# --- Sezione: Elaborazione e Visualizzazione ---
 if not macchine_list or not corridoi_list:
     st.error("Dati insufficienti per costruire il grafo.")
 else:
