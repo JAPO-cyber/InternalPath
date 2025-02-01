@@ -89,15 +89,15 @@ def disegna_grafo(G, background_img=None, extent=None):
     
     # Se è presente un'immagine di background, la mostriamo
     if background_img is not None and extent is not None:
-        ax.imshow(background_img, extent=extent, aspect='auto', alpha=0.5, zorder=0)
+        ax.imshow(background_img, extent=extent, aspect='auto', alpha=0.5)
     
-    # Disegniamo il grafo
-    nx.draw(G, pos, with_labels=True, node_color=node_colors, node_size=600, font_weight='bold', ax=ax, zorder=1)
+    # Disegniamo il grafo sopra l'immagine
+    nx.draw(G, pos, with_labels=True, node_color=node_colors, node_size=600, font_weight='bold', ax=ax)
     
-    # Disegniamo le etichette degli archi con i pesi
+    # Disegniamo le etichette degli archi con i pesi (arrotondati a 2 decimali)
     edge_labels = nx.get_edge_attributes(G, 'weight')
     edge_labels = {edge: f"{weight:.2f}" for edge, weight in edge_labels.items()}
-    nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, ax=ax, zorder=2)
+    nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, ax=ax)
     
     # Impostiamo le etichette degli assi e la scala
     ax.set_xlabel("Coordinata X")
@@ -144,4 +144,3 @@ for key, info in percorsi_macchine.items():
 st.subheader("Grafico del Grafo con il Layout della Fabbrica")
 fig = disegna_grafo(G, background_img=background_img, extent=extent)
 st.pyplot(fig)
-
