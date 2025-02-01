@@ -105,32 +105,36 @@ def calcola_percorsi_macchine(G, macchine_list):
     return percorsi_macchine
 
 ###############################
-# 3. Funzioni per Disegnare il Grafo
+# 3. Funzione per Disegnare il Grafo (con dimensioni differenti per macchine e corridoi)
 ###############################
 
 def disegna_grafo(G, background_img=None, extent=None):
     # Posizioni dei nodi in base alle coordinate reali
     pos = {}
     node_colors = []
+    node_sizes = []  # Dimensione specifica per ogni nodo
+
     for node in G.nodes():
         punto = G.nodes[node]['punto']
         pos[node] = (punto.x, punto.y)
         if punto.categoria == "macchina":
             node_colors.append('red')
+            node_sizes.append(600)  # Dimensione maggiore per le macchine
         else:
             node_colors.append('blue')
-    
+            node_sizes.append(300)  # Dimensione ridotta per i corridoi
+
     fig, ax = plt.subplots(figsize=(8, 6))
     
     if background_img is not None and extent is not None:
         ax.imshow(background_img, extent=extent, aspect='auto', alpha=0.5)
     
     if isinstance(G, nx.DiGraph):
-        nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=600, ax=ax)
+        nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=node_sizes, ax=ax)
         nx.draw_networkx_labels(G, pos, ax=ax)
         nx.draw_networkx_edges(G, pos, ax=ax, arrowstyle='->', arrowsize=15)
     else:
-        nx.draw(G, pos, with_labels=True, node_color=node_colors, node_size=600, font_weight='bold', ax=ax)
+        nx.draw(G, pos, with_labels=True, node_color=node_colors, node_size=node_sizes, font_weight='bold', ax=ax)
     
     edge_labels = nx.get_edge_attributes(G, 'weight')
     edge_labels = {edge: f"{weight:.2f}" for edge, weight in edge_labels.items()}
@@ -311,7 +315,7 @@ C3,25,30,0.78
         except Exception as e:
             st.error(f"Errore nella riga dei corridoi (default): {e}")
 
-# Verifica che ci siano dati sufficienti
+# Verifica che ci siano dati sufficienti e visualizza
 if not macchine_list or not corridoi_list:
     st.error("Dati insufficienti per costruire il grafo.")
 else:
@@ -329,5 +333,3 @@ else:
     st.subheader("Grafico del Grafo")
     fig = disegna_grafo(G, background_img=background_img, extent=extent)
     st.pyplot(fig)
-
-
