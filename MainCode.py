@@ -69,15 +69,15 @@ def costruisci_grafo():
     
     return G, percorsi_macchine
 
-# Funzione per disegnare il grafo
+# Funzione per disegnare il grafo rispettando le coordinate x e y
 def disegna_grafo(G):
-    # Prepariamo le posizioni dei nodi in base alle coordinate (x,y)
+    # Prepariamo le posizioni dei nodi in base alle coordinate (x,y) dei nostri punti
     pos = {}
     node_colors = []
     for node in G.nodes():
         punto = G.nodes[node]['punto']
         pos[node] = (punto.x, punto.y)
-        # Coloriamo in base alla categoria
+        # Coloriamo in base alla categoria: rosso per le macchine, blu per i corridoi
         if punto.categoria == "macchina":
             node_colors.append('red')
         else:
@@ -86,7 +86,7 @@ def disegna_grafo(G):
     # Creiamo la figura
     fig, ax = plt.subplots(figsize=(8, 6))
     
-    # Disegniamo il grafo
+    # Disegniamo il grafo utilizzando le posizioni fornite
     nx.draw(G, pos, with_labels=True, node_color=node_colors, node_size=600, font_weight='bold', ax=ax)
     
     # Aggiungiamo le etichette degli archi con i pesi (arrotondati a 2 decimali)
@@ -94,8 +94,13 @@ def disegna_grafo(G):
     edge_labels = {edge: f"{weight:.2f}" for edge, weight in edge_labels.items()}
     nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, ax=ax)
     
-    ax.set_title("Grafo: Macchine e Corridoi")
+    # Impostiamo etichette per gli assi e una scala uniforme per rispettare le coordinate
+    ax.set_xlabel("Coordinata X")
+    ax.set_ylabel("Coordinata Y")
     ax.axis('equal')
+    ax.grid(True)
+    ax.set_title("Grafo: Macchine e Corridoi (Coordinate reali)")
+    
     return fig
 
 # Corpo principale dell'app Streamlit
@@ -111,6 +116,7 @@ for key, info in percorsi_macchine.items():
     st.write(f"Path: {info['path']}")
     st.write(f"Distanza totale: {info['distance']:.2f}")
 
-st.subheader("Grafico del Grafo")
+st.subheader("Grafico del Grafo (rispettando le coordinate X e Y)")
 fig = disegna_grafo(G)
 st.pyplot(fig)
+
