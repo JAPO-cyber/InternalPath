@@ -100,17 +100,17 @@ def main():
             La logica è la seguente:
               1. Se il campo "Size" è impostato, per il primo candidato si filtrano i nodi corridoio
                  in base alle coordinate della macchina:
-                   - "Alto": si considerano solo corridoi con Y maggiore della Y della macchina.
-                   - "Basso": si considerano solo corridoi con Y minore della Y della macchina.
-                   - "Sinistro": si considerano solo corridoi con X minore della X della macchina.
-                   - "Destro": si considerano solo corridoi con X maggiore della X della macchina.
-                 Se non viene trovato alcun nodo, si usa il candidato più vicino in assoluto.
+                   - "alto": si considerano solo corridoi con Y maggiore della Y della macchina.
+                   - "basso": si considerano solo corridoi con Y minore della Y della macchina.
+                   - "sinistro": si considerano solo corridoi con X minore della X della macchina.
+                   - "destro": si considerano solo corridoi con X maggiore della X della macchina.
+                 Se nessun nodo soddisfa il filtro, **non si applica alcun fallback**.
               2. Candidate1 viene aggiunto alla catena.
               3. Per ogni candidato successivo, la condizione viene applicata rispetto al nodo precedentemente selezionato:
-                   - "Alto": il successivo deve avere Y maggiore del nodo corrente.
-                   - "Basso": il successivo deve avere Y minore del nodo corrente.
-                   - "Sinistro": il successivo deve avere X minore del nodo corrente.
-                   - "Destro": il successivo deve avere X maggiore del nodo corrente.
+                   - "alto": il successivo deve avere Y maggiore del nodo corrente.
+                   - "basso": il successivo deve avere Y minore del nodo corrente.
+                   - "sinistro": il successivo deve avere X minore del nodo corrente.
+                   - "destro": il successivo deve avere X maggiore del nodo corrente.
               4. Tra i nodi validi si sceglie quello più vicino al nodo corrente.
               5. La catena si conclude quando non esistono ulteriori nodi validi.
               
@@ -119,48 +119,45 @@ def main():
             """
             chain = []
             size_val = G.nodes[machine_idx]["size"]
-            
-            # Use a stripped version of size_val to avoid trailing/leading spaces issues
-            direction = size_val.strip() if isinstance(size_val, str) else ""
+            direction = size_val.strip().lower() if isinstance(size_val, str) else ""
 
-            # --- Se il campo Size è impostato, applica il filtro per il primo candidato ---
+            # --- Se il campo Size è impostato, applica IL FILTRO per il primo candidato ---
             if direction == "":
-                # Nessun filtro direzionale: candidato è il più vicino alla macchina
                 candidate = min(corridor_indices, key=lambda c: distance(machine_idx, c))
             else:
                 machine_x = G.nodes[machine_idx]["x"]
                 machine_y = G.nodes[machine_idx]["y"]
-                if direction == "Alto":
+                if direction == "alto":
                     valid_first = [c for c in corridor_indices if G.nodes[c]["y"] > machine_y]
-                elif direction == "Basso":
+                elif direction == "basso":
                     valid_first = [c for c in corridor_indices if G.nodes[c]["y"] < machine_y]
-                elif direction == "Sinistro":
+                elif direction == "sinistro":
                     valid_first = [c for c in corridor_indices if G.nodes[c]["x"] < machine_x]
-                elif direction == "Destro":
+                elif direction == "destro":
                     valid_first = [c for c in corridor_indices if G.nodes[c]["x"] > machine_x]
                 else:
-                    valid_first = corridor_indices
-
+                    valid_first = []
+                # **Do not fallback:** if no node satisfies the directional filter, return an empty chain.
                 if valid_first:
                     candidate = min(valid_first, key=lambda c: distance(machine_idx, c))
                 else:
-                    # Nessun nodo soddisfa il filtro: usa il più vicino in assoluto
-                    candidate = min(corridor_indices, key=lambda c: distance(machine_idx, c))
+                    candidate = None
+            if candidate is None:
+                return chain  # returns empty chain if no valid candidate is found
             chain.append(candidate)
             
             # --- Ora, per ogni successivo nodo della catena, applica il filtro relativo al nodo corrente ---
             if direction == "":
-                return chain  # Nessuna direzione richiesta, restituisce solo il primo candidato
-
+                return chain  # Se non c'è direzione, la catena contiene solo il candidato più vicino.
             while True:
                 last_candidate = chain[-1]
-                if direction == "Alto":
+                if direction == "alto":
                     valid = [c for c in corridor_indices if c not in chain and G.nodes[c]["y"] > G.nodes[last_candidate]["y"]]
-                elif direction == "Basso":
+                elif direction == "basso":
                     valid = [c for c in corridor_indices if c not in chain and G.nodes[c]["y"] < G.nodes[last_candidate]["y"]]
-                elif direction == "Sinistro":
+                elif direction == "sinistro":
                     valid = [c for c in corridor_indices if c not in chain and G.nodes[c]["x"] < G.nodes[last_candidate]["x"]]
-                elif direction == "Destro":
+                elif direction == "destro":
                     valid = [c for c in corridor_indices if c not in chain and G.nodes[c]["x"] > G.nodes[last_candidate]["x"]]
                 else:
                     valid = []
@@ -177,7 +174,7 @@ def main():
                     break
             return chain
 
-        # Per ogni macchina, applica la logica a catena e collega i nodi
+        # Per ogni macchina, applica la logica a catena e collega i nodi (solo se la catena non è vuota)
         for idx_m in df_macchina.index:
             chain = choose_corridor_chain(idx_m, corr_indices)
             if chain:
@@ -191,6 +188,8 @@ def main():
                         (G.nodes[chain[i+1]]["x"], G.nodes[chain[i+1]]["y"])
                     )
                     G.add_edge(chain[i], chain[i+1], weight=w)
+            else:
+                st.write(f"Nessun nodo corridoio soddisfa il filtro per la macchina {G.nodes[idx_m]['name']} con Size '{G.nodes[idx_m]['size']}'.")
 
         st.write(f"**Nodi nel grafo**: {G.number_of_nodes()}")
         st.write(f"**Archi nel grafo**: {G.number_of_edges()}")
@@ -367,7 +366,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
