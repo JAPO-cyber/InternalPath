@@ -3,4 +3,4 @@ matplotlib
 streamlit
 xlsxwriter
 pandas
-
+openpyxl
