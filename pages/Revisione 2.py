@@ -94,31 +94,62 @@ def main():
         # ====== 2) Collegamento Macchine a Corridoi con logica a catena per ogni punto ======
         def choose_corridor_chain(machine_idx, corridor_indices):
             """
-            Per una macchina data, costruisce una catena di nodi corridoio basata sulla direzione indicata
-            nel campo "Size".
+            Per una macchina data, costruisce una catena di nodi corridoio in cui ogni punto 
+            è scelto in base alla direzione indicata nel campo "Size".  
             
-            1. Si seleziona il nodo corridoio più vicino alla macchina (candidate1).
-            2. Se il campo "Size" è impostato (Alto, Basso, Sinistro, Destro), 
-               per ogni punto della catena si seleziona il prossimo nodo corridoio che:
-                 - Non è già stato selezionato.
-                 - Rispetta la condizione rispetto al nodo precedente:
-                     * "Alto": il nodo successivo deve avere Y maggiore del nodo precedente.
-                     * "Basso": il nodo successivo deve avere Y minore del nodo precedente.
-                     * "Sinistro": il nodo successivo deve avere X minore del nodo precedente.
-                     * "Destro": il nodo successivo deve avere X maggiore del nodo precedente.
-               Tra i nodi validi si sceglie quello più vicino al nodo corrente.
-            3. La catena termina quando non esistono ulteriori nodi validi.
-            
-            Se il campo "Size" non è impostato o è vuoto, viene restituita la catena contenente solo candidate1.
+            La logica è la seguente:
+              1. Se il campo "Size" è impostato, per il primo candidato si filtrano i nodi corridoio
+                 in base alle coordinate della macchina:
+                   - "Alto": si considerano solo corridoi con Y maggiore della Y della macchina.
+                   - "Basso": si considerano solo corridoi con Y minore della Y della macchina.
+                   - "Sinistro": si considerano solo corridoi con X minore della X della macchina.
+                   - "Destro": si considerano solo corridoi con X maggiore della X della macchina.
+                 Se non viene trovato alcun nodo, si usa il candidato più vicino in assoluto.
+              2. Candidate1 viene aggiunto alla catena.
+              3. Per ogni candidato successivo, la condizione viene applicata rispetto al nodo precedentemente selezionato:
+                   - "Alto": il successivo deve avere Y maggiore del nodo corrente.
+                   - "Basso": il successivo deve avere Y minore del nodo corrente.
+                   - "Sinistro": il successivo deve avere X minore del nodo corrente.
+                   - "Destro": il successivo deve avere X maggiore del nodo corrente.
+              4. Tra i nodi validi si sceglie quello più vicino al nodo corrente.
+              5. La catena si conclude quando non esistono ulteriori nodi validi.
+              
+            Se il campo "Size" non è impostato o è vuoto, viene restituita la catena contenente
+            solo il candidato più vicino (senza filtri direzionali).
             """
             chain = []
-            # Primo candidato: il corridoio più vicino alla macchina
-            candidate = min(corridor_indices, key=lambda c: distance(machine_idx, c))
-            chain.append(candidate)
             size_val = G.nodes[machine_idx]["size"]
+
+            # --- Se il campo Size è impostato, applica il filtro per il primo candidato ---
             if pd.isna(size_val) or size_val.strip() == "":
-                return chain
-            # Iterativamente, scegliamo il prossimo nodo in base alla direzione
+                # Nessun filtro direzionale, candidate è il più vicino alla macchina
+                candidate = min(corridor_indices, key=lambda c: distance(machine_idx, c))
+            else:
+                # Filtra i nodi corridoio in base alla posizione della macchina
+                machine_x = G.nodes[machine_idx]["x"]
+                machine_y = G.nodes[machine_idx]["y"]
+                if size_val == "Alto":
+                    valid_first = [c for c in corridor_indices if G.nodes[c]["y"] > machine_y]
+                elif size_val == "Basso":
+                    valid_first = [c for c in corridor_indices if G.nodes[c]["y"] < machine_y]
+                elif size_val == "Sinistro":
+                    valid_first = [c for c in corridor_indices if G.nodes[c]["x"] < machine_x]
+                elif size_val == "Destro":
+                    valid_first = [c for c in corridor_indices if G.nodes[c]["x"] > machine_x]
+                else:
+                    valid_first = corridor_indices
+
+                if valid_first:
+                    candidate = min(valid_first, key=lambda c: distance(machine_idx, c))
+                else:
+                    # Nessun nodo soddisfa il filtro: usa il più vicino in assoluto
+                    candidate = min(corridor_indices, key=lambda c: distance(machine_idx, c))
+            chain.append(candidate)
+            
+            # --- Ora, per ogni successivo nodo della catena, applica il filtro relativo al nodo corrente ---
+            if pd.isna(size_val) or size_val.strip() == "":
+                return chain  # Nessuna direzione richiesta, restituisci solo il primo candidato
+
             while True:
                 last_candidate = chain[-1]
                 if size_val == "Alto":
@@ -334,7 +365,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 
 
