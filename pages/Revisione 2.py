@@ -9,38 +9,38 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 
 def main():
-    st.title("Grafo Corridoio-Macchina – Catena con Filtraggio ad Ogni Step")
+    st.title("Grafo Corridoio-Macchina – Constrained Path using Size")
 
-    # 1. Carica file Excel
+    # 1. Upload Excel file
     excel_file = st.file_uploader(
         label="Carica un file Excel (X, Y, Tag, Entity Name, Size)",
         type=["xls", "xlsx"]
     )
     
-    # 2. (Opzionale) Carica immagine di sfondo
+    # 2. (Optional) Upload background image
     bg_image_file = st.file_uploader(
         label="Carica un'immagine di sfondo (jpg, jpeg, png) [Opzionale]",
         type=["jpg", "jpeg", "png"]
     )
     
     if excel_file is not None:
-        # Legge il DataFrame
+        # Read the DataFrame
         df = pd.read_excel(excel_file)
         st.subheader("Anteprima del DataFrame caricato")
         st.dataframe(df.head())
         
-        # Verifica le colonne necessarie
+        # Verify required columns
         needed_cols = ["X", "Y", "Tag", "Entity Name", "Size"]
         for c in needed_cols:
             if c not in df.columns:
                 st.error(f"Colonna '{c}' mancante nel file Excel.")
                 return
         
-        # Converte X e Y in numerico
+        # Convert X and Y to numeric
         df["X"] = pd.to_numeric(df["X"], errors="coerce")
         df["Y"] = pd.to_numeric(df["Y"], errors="coerce")
         
-        # Suddivide in nodi "Corridoio" e "Macchina"
+        # Split into corridor and machine nodes
         df_corridoio = df[df["Tag"] == "Corridoio"].copy()
         df_macchina = df[df["Tag"] == "Macchina"].copy()
         if df_corridoio.empty:
@@ -48,9 +48,8 @@ def main():
             return
         if df_macchina.empty:
             st.warning("Non ci sono macchine: non ci sono coppie da calcolare.")
-            # (Se necessario, puoi comunque visualizzare solo il grafo dei corridoi)
         
-        # Crea il grafo principale e aggiunge tutti i nodi
+        # Create the master graph G (which will contain the MST of corridors)
         G = nx.Graph()
         for idx, row in df.iterrows():
             G.add_node(
@@ -62,13 +61,13 @@ def main():
                 size=row.get("Size", None)
             )
         
-        # Funzione per calcolare la distanza euclidea
+        # Euclidean distance function
         def distance(n1, n2):
             x1, y1 = G.nodes[n1]["x"], G.nodes[n1]["y"]
             x2, y2 = G.nodes[n2]["x"], G.nodes[n2]["y"]
             return math.dist((x1, y1), (x2, y2))
         
-        # ====== 1) Collegamento Corridoi (MST) ======
+        # --- Build the MST for corridors (for visualization purposes) ---
         corr_indices = df_corridoio.index.tolist()
         G_corr = nx.Graph()
         G_corr.add_nodes_from(corr_indices)
@@ -82,31 +81,28 @@ def main():
         for (c1, c2) in mst_corridoi.edges():
             G.add_edge(c1, c2, weight=G_corr[c1][c2]["weight"])
         
-        # ====== 2) Collegamento Macchine a Corridoi con Catena "Hard‐Filtered" ======
+        # --- Build the constrained edge graph H using your chain logic ---
+        H = nx.Graph()
+        # Add all machine nodes to H (with attributes)
+        for idx in df_macchina.index:
+            H.add_node(idx, **G.nodes[idx])
+        # Also add corridor nodes later as they appear in the chains.
+        
         def choose_corridor_chain(machine_idx, corridor_indices):
             """
-            Per la macchina indicata, costruisce una catena di nodi corridoio
-            in base alla direzione indicata nel campo "Size" della macchina.
-            
-            • Per il primo candidato, si filtrano **solamente** i nodi corridoio (non la macchina)
-                che soddisfano la condizione rispetto alle coordinate della macchina.
-                Ad esempio, se Size è "destro", vengono considerati solo i nodi corridoio con x > machine.x.
-            
-            • Una volta scelto il primo candidato, la catena viene estesa in modo iterativo:
-                il prossimo candidato è scelto filtrando i nodi corridoio in base al nodo corridoio precedente.
-                Ad esempio, se il primo candidato ha x = 3.46, per Size "destro" vengono considerati
-                solo i nodi corridoio con x > 3.46.
-            
-            Ritorna la lista (catena) dei nodi corridoio selezionati.
-            Se nessun nodo soddisfa il filtro per il primo candidato, ritorna una lista vuota.
+            For the given machine, build a chain of corridor nodes as follows:
+              - For the first candidate, filter corridor nodes (only corridors, not machine nodes)
+                using the machine’s coordinate and the Size condition.
+                For example, if Size is "destro", keep only corridors with x > machine.x.
+              - Then, for subsequent candidates, filter using the previously chosen corridor node.
+              - Return the list (chain) of corridor nodes.
+            If no corridor satisfies the constraint for the first candidate, return an empty list.
             """
             size_val = G.nodes[machine_idx]["size"]
             direction = size_val.strip().lower() if isinstance(size_val, str) else ""
             machine_x = G.nodes[machine_idx]["x"]
             machine_y = G.nodes[machine_idx]["y"]
             chain = []
-            
-            # Per il primo candidato, filtriamo utilizzando la macchina (e non includiamo la macchina stessa)
             if direction == "destro":
                 valid_first = [c for c in corridor_indices if G.nodes[c]["x"] > machine_x]
                 sorted_first = sorted(valid_first, key=lambda c: G.nodes[c]["x"])
@@ -120,18 +116,16 @@ def main():
                 valid_first = [c for c in corridor_indices if G.nodes[c]["y"] < machine_y]
                 sorted_first = sorted(valid_first, key=lambda c: G.nodes[c]["y"], reverse=True)
             else:
-                # Se il campo Size è vuoto, restituisci il singolo candidato (più vicino)
+                # No constraint—return the single nearest corridor
                 candidate = min(corridor_indices, key=lambda c: distance(machine_idx, c))
                 return [candidate]
             
             if not sorted_first:
-                return []  # nessun nodo corridoio soddisfa il filtro rispetto alla macchina
+                return []  # no corridor satisfies the machine constraint
             
-            # Prendi il primo candidato dalla lista ordinata
             chain.append(sorted_first[0])
-            
-            # Ora, per ogni step successivo, filtra i nodi corridoio in base al nodo corridoio precedente.
-            last = chain[0]
+            last = sorted_first[0]
+            # Extend chain by filtering relative to the last corridor node.
             while True:
                 if direction == "destro":
                     valid_next = [c for c in corridor_indices if G.nodes[c]["x"] > G.nodes[last]["x"]]
@@ -148,85 +142,82 @@ def main():
                 else:
                     valid_next = []
                 
-                # Escludi i nodi già nella catena
+                # Exclude already chosen corridors
                 valid_next = [c for c in valid_next if c not in chain]
                 if not valid_next:
                     break
-                # Prendi il primo candidato della lista ordinata
                 chain.append(valid_next[0])
                 last = valid_next[0]
             return chain
         
-        # Per ogni macchina, ottieni la catena filtrata e crea gli archi corrispondenti
+        # For each machine, compute its constrained chain and add edges to H.
         for idx_m in df_macchina.index:
             chain = choose_corridor_chain(idx_m, corr_indices)
             if chain:
-                # Collega la macchina al primo nodo corridoio della catena
+                # Add the corridor nodes (if not already present) to H.
+                for c in chain:
+                    if c not in H:
+                        H.add_node(c, **G.nodes[c])
+                # Connect machine to the first corridor in its chain.
                 w1 = distance(idx_m, chain[0])
-                G.add_edge(idx_m, chain[0], weight=w1)
-                # Collega in sequenza i nodi corridoio della catena
+                H.add_edge(idx_m, chain[0], weight=w1)
+                # Connect the corridor chain sequentially.
                 for i in range(len(chain) - 1):
                     w = distance(chain[i], chain[i+1])
-                    G.add_edge(chain[i], chain[i+1], weight=w)
+                    H.add_edge(chain[i], chain[i+1], weight=w)
             else:
                 st.write(f"Nessun nodo corridoio soddisfa il filtro per la macchina '{G.nodes[idx_m]['name']}' con Size '{G.nodes[idx_m]['size']}'.")
 
-        st.write(f"**Nodi nel grafo**: {G.number_of_nodes()}")
-        st.write(f"**Archi nel grafo**: {G.number_of_edges()}")
+        st.write(f"**Nodi nel grafo principale G**: {G.number_of_nodes()}")
+        st.write(f"**Archi nel grafo principale G**: {G.number_of_edges()}")
+        st.write(f"**Nodi nel grafo H (constrained edges)**: {H.number_of_nodes()}")
+        st.write(f"**Archi nel grafo H (constrained edges)**: {H.number_of_edges()}")
         
-        # ====== 3) Calcolo delle distanze tra coppie di macchine ======
-        st.subheader("Distanze tra coppie di macchine (con percorso completo)")
+        # --- 3) Compute shortest paths between machines using graph H ---
+        st.subheader("Distanze tra coppie di macchine (usando solo i vincoli Size)")
         machine_indices = df_macchina.index.tolist()
         if len(machine_indices) < 2:
             st.info("Meno di due macchine, nessuna coppia da calcolare.")
             return
         
-        G_paths = nx.Graph()
-        G_paths.add_nodes_from(G.nodes(data=True))
-        edge_usage_count = defaultdict(int)
+        # Compute shortest path on H (which includes only our constrained edges)
         results = []
-        pairs = itertools.combinations(machine_indices, 2)
-        for m1, m2 in pairs:
-            name1 = G.nodes[m1]["name"]
-            name2 = G.nodes[m2]["name"]
-            path_nodes = nx.shortest_path(G, m1, m2, weight='weight')
-            segment_distances = []
+        edge_usage_count = defaultdict(int)
+        for m1, m2 in itertools.combinations(machine_indices, 2):
+            try:
+                path_nodes = nx.shortest_path(H, m1, m2, weight='weight')
+            except nx.NetworkXNoPath:
+                st.write(f"Nessun percorso tra {G.nodes[m1]['name']} e {G.nodes[m2]['name']} nel grafo vincolato.")
+                continue
+            seg_dists = []
             for i in range(len(path_nodes) - 1):
-                nA = path_nodes[i]
-                nB = path_nodes[i+1]
-                d_seg = G[nA][nB]['weight']
-                segment_distances.append(d_seg)
-                edge_key = tuple(sorted([nA, nB]))
+                seg_d = H[path_nodes[i]][path_nodes[i+1]]['weight']
+                seg_dists.append(seg_d)
+                edge_key = tuple(sorted([path_nodes[i], path_nodes[i+1]]))
                 edge_usage_count[edge_key] += 1
-            total_dist = sum(segment_distances)
-            path_list = [G.nodes[nd]["name"] for nd in path_nodes]
-            path_str = " -> ".join(path_list)
-            sum_str = " + ".join(f"{d_val:.2f}" for d_val in segment_distances) + f" = {total_dist:.2f}"
+            tot_d = sum(seg_dists)
+            path_names = [H.nodes[nd]["name"] for nd in path_nodes]
             results.append({
-                "Coppia Macchine": f"{name1} - {name2}",
-                "Percorso (macchine + corridoi)": path_str,
-                "Somma distanze (stringa)": sum_str,
-                "Valore complessivo": total_dist
+                "Coppia Macchine": f"{H.nodes[m1]['name']} - {H.nodes[m2]['name']}",
+                "Percorso (macchine + corridoi)": " -> ".join(path_names),
+                "Somma distanze (stringa)": " + ".join(f"{d:.2f}" for d in seg_dists) + f" = {tot_d:.2f}",
+                "Valore complessivo": tot_d
             })
-        for (n1, n2), usage_count in edge_usage_count.items():
-            d_val = G[n1][n2]['weight']
-            G_paths.add_edge(n1, n2, weight=d_val, count=usage_count)
         df_results = pd.DataFrame(results).sort_values(by="Valore complessivo", ascending=True)
-        st.write("Tabella dei risultati:")
+        st.write("Tabella dei risultati (usando solo i vincoli Size):")
         st.dataframe(df_results)
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             df_results.to_excel(writer, index=False, sheet_name="Distanze_coppie")
-        excel_data = output.getvalue()
         st.download_button(
             label="Scarica risultati in Excel",
-            data=excel_data,
+            data=output.getvalue(),
             file_name="distanze_coppie_macchine.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
         
-        # ====== 4) Visualizzazione del sottografo G_paths ======
-        st.subheader("Visualizzazione dei percorsi effettivamente usati (con count su ciascun arco)")
+        # --- 4) Visualization of the constrained subgraph H ---
+        st.subheader("Visualizzazione del sottografo H (solo vincoli Size)")
         if bg_image_file is not None:
             bg_image = Image.open(bg_image_file)
             x_min, x_max = df["X"].min(), df["X"].max()
@@ -237,72 +228,20 @@ def main():
                 fig2, ax2 = plt.subplots(figsize=(10, 8))
                 ax2.imshow(bg_image, extent=[x_min, x_max, y_min, y_max],
                            aspect='auto', origin='upper')
-                for (n1, n2) in G_paths.edges():
-                    x1, y1 = G_paths.nodes[n1]["x"], G_paths.nodes[n1]["y"]
-                    x2, y2 = G_paths.nodes[n2]["x"], G_paths.nodes[n2]["y"]
+                for (n1, n2) in H.edges():
+                    x1, y1 = H.nodes[n1]["x"], H.nodes[n1]["y"]
+                    x2, y2 = H.nodes[n2]["x"], H.nodes[n2]["y"]
                     ax2.plot([x1, x2], [y1, y2], color='blue', linewidth=2, alpha=0.7)
-                    usage_count = G_paths[n1][n2]['count']
-                    xm = (x1 + x2) / 2
-                    ym = (y1 + y2) / 2
-                    ax2.text(xm, ym, str(usage_count), color="blue", fontsize=10,
-                             ha="center", va="center",
-                             bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="blue", alpha=0.6))
-                coords_corridoio = []
-                coords_macchina = []
-                for nd in G_paths.nodes():
-                    tag_nd = G_paths.nodes[nd]["tag"]
-                    x_val = G_paths.nodes[nd]["x"]
-                    y_val = G_paths.nodes[nd]["y"]
-                    if pd.notna(x_val) and pd.notna(y_val):
-                        if tag_nd == "Corridoio":
-                            coords_corridoio.append((x_val, y_val))
-                        elif tag_nd == "Macchina":
-                            coords_macchina.append((x_val, y_val))
-                if coords_corridoio:
-                    x_c, y_c = zip(*coords_corridoio)
-                    ax2.scatter(x_c, y_c, c='green', marker='o', label='Corridoio')
-                if coords_macchina:
-                    x_m, y_m = zip(*coords_macchina)
-                    ax2.scatter(x_m, y_m, c='red', marker='s', label='Macchina')
-                ax2.set_title("Sottografo dei percorsi Macchina-Macchina (count archi)")
-                ax2.legend()
-                st.pyplot(fig2)
-        else:
-            fig2, ax2 = plt.subplots(figsize=(10, 8))
-            for (n1, n2) in G_paths.edges():
-                x1, y1 = G_paths.nodes[n1]["x"], G_paths.nodes[n1]["y"]
-                x2, y2 = G_paths.nodes[n2]["x"], G_paths.nodes[n2]["y"]
-                ax2.plot([x1, x2], [y1, y2], color='blue', linewidth=2, alpha=0.7)
-                usage_count = G_paths[n1][n2]['count']
-                xm = (x1 + x2) / 2
-                ym = (y1 + y2) / 2
-                ax2.text(xm, ym, str(usage_count), color="blue", fontsize=10,
-                         ha="center", va="center",
-                         bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="blue", alpha=0.6))
-            coords_corridoio = []
-            coords_macchina = []
-            for nd in G_paths.nodes():
-                tag_nd = G_paths.nodes[nd]["tag"]
-                x_val = G_paths.nodes[nd]["x"]
-                y_val = G_paths.nodes[nd]["y"]
-                if pd.notna(x_val) and pd.notna(y_val):
-                    if tag_nd == "Corridoio":
-                        coords_corridoio.append((x_val, y_val))
-                    elif tag_nd == "Macchina":
-                        coords_macchina.append((x_val, y_val))
-            if coords_corridoio:
-                x_c, y_c = zip(*coords_corridoio)
-                ax2.scatter(x_c, y_c, c='green', marker='o', label='Corridoio')
-            if coords_macchina:
-                x_m, y_m = zip(*coords_macchina)
-                ax2.scatter(x_m, y_m, c='red', marker='s', label='Macchina')
-            ax2.set_title("Sottografo dei percorsi Macchina-Macchina (count archi)")
-            ax2.legend()
-            st.pyplot(fig2)
-    else:
-        st.write("Carica un file Excel per iniziare.")
+                # Plot nodes
+                machine_nodes = [n for n in H.nodes() if H.nodes[n]["tag"] == "Macchina"]
+                corridor_nodes = [n for n in H.nodes() if H.nodes[n]["tag"] == "Corridoio"]
+                if machine_nodes:
+                    x_machine = [H.nodes[n]["x"] for n in machine_nodes]
+                    y_machine = [H.nodes[n]["y"] for n in machine_nodes]
+                    ax2.scatter(x_machine, y_machine, color='red', marker='s', label='Macchina')
+                if corridor_nodes:
+                    x_corr = [H.nodes[n]["x"] for n in corridor_nodes]
+                    y_corr = [H.nodes[n]["y"] for n in 
 
-if __name__ == "__main__":
-    main()
 
 
