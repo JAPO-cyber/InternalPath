@@ -6,9 +6,10 @@ import itertools
 import io
 from PIL import Image
 import matplotlib.pyplot as plt
+from collections import defaultdict
 
 def main():
-    st.title("Distanze tra coppie di macchine e visualizzazione SOLO dei percorsi trovati")
+    st.title("Distanze tra coppie di macchine, visualizzazione percorsi e conteggio utilizzi archi")
 
     # 1. Caricamento file Excel
     excel_file = st.file_uploader(
@@ -53,10 +54,10 @@ def main():
         if df_macchina.empty:
             st.warning("Non ci sono macchine; non ci sono coppie da calcolare.")
 
-        # =============== COSTRUZIONE GRAFO ===============
+        # =============== COSTRUZIONE GRAFO COMPLETO ===============
         G = nx.Graph()
 
-        # Aggiunge tutti i punti come nodi
+        # Aggiungi tutti i punti come nodi
         for idx, row in df.iterrows():
             G.add_node(idx,
                        x=row["X"],
@@ -101,7 +102,7 @@ def main():
         st.write(f"**Nodi nel grafo**: {G.number_of_nodes()}")
         st.write(f"**Archi nel grafo**: {G.number_of_edges()}")
 
-        # =============== CALCOLO DISTANZE COPPIE (SENZA ORDINE) ===============
+        # =============== CALCOLO DISTANZE COPPIE ===============
         st.subheader("Distanze tra coppie di macchine (con percorso completo)")
 
         machine_indices = df_macchina.index.tolist()
@@ -109,41 +110,45 @@ def main():
             st.info("Meno di due macchine, nessuna coppia da calcolare.")
             return
 
-        pairs = itertools.combinations(machine_indices, 2)
-        results = []
-
-        # Creiamo un sottografo che conterrà solo gli archi effettivamente usati dai percorsi
+        # Creiamo un sottografo con tutti i nodi (per mantenere attributi x, y, name, tag)
+        # In cui aggiungeremo solo gli archi usati nei percorsi
         G_paths = nx.Graph()
-        # Aggiunge tutti i nodi con i loro attributi (così abbiamo coordinate e nome)
         G_paths.add_nodes_from(G.nodes(data=True))
+
+        # Dizionario per contare l'utilizzo di ogni arco (edge) nei percorsi
+        edge_usage_count = defaultdict(int)
+
+        results = []
+        pairs = itertools.combinations(machine_indices, 2)
 
         for (m1, m2) in pairs:
             name1 = G.nodes[m1]["name"]
             name2 = G.nodes[m2]["name"]
 
-            # Troviamo il path effettivo (lista di nodi)
+            # 1) Troviamo il path effettivo (lista di nodi)
             path_nodes = nx.shortest_path(G, m1, m2, weight='weight')
 
-            # Calcola le distanze "segmento per segmento"
+            # 2) Calcola le distanze "segmento per segmento"
             segment_distances = []
             for i in range(len(path_nodes) - 1):
                 nA = path_nodes[i]
-                nB = path_nodes[i+1]
+                nB = path_nodes[i + 1]
                 dist_seg = G[nA][nB]['weight']
                 segment_distances.append(dist_seg)
 
-                # Aggiungiamo quest'arco al sottografo G_paths
-                if not G_paths.has_edge(nA, nB):
-                    G_paths.add_edge(nA, nB, weight=dist_seg)
+                # A) Creiamo una rappresentazione ordinata dell'arco
+                #    (così (nA,nB) e (nB,nA) vengono contati come lo stesso arco)
+                edge_key = tuple(sorted([nA, nB]))
+                edge_usage_count[edge_key] += 1
 
-            # Somma totale
+            # 3) Somma totale
             total_dist = sum(segment_distances)
 
-            # Costruisci la stringa con TUTTO il percorso (macchina iniziale, eventuali corridoi, macchina finale)
+            # 4) Stringa del percorso
             path_list = [G.nodes[nd]["name"] for nd in path_nodes]
             path_str = " -> ".join(path_list)
 
-            # Crea la stringa delle distanze
+            # 5) Stringa delle distanze
             sum_str = " + ".join(f"{dist_val:.2f}" for dist_val in segment_distances)
             sum_str += f" = {total_dist:.2f}"
 
@@ -154,10 +159,13 @@ def main():
                 "Valore complessivo": total_dist
             })
 
-        # Convertiamo in DataFrame e mostriamo
-        df_results = pd.DataFrame(results)
-        # Ordiniamo per "Valore complessivo"
-        df_results = df_results.sort_values(by="Valore complessivo", ascending=True)
+        # Ora, aggiungiamo effettivamente gli archi al G_paths, assegnandogli l'attributo 'count'
+        for (n1, n2), usage_count in edge_usage_count.items():
+            dist_val = G[n1][n2]['weight']
+            G_paths.add_edge(n1, n2, weight=dist_val, count=usage_count)
+
+        # -- Creiamo il DataFrame dei risultati e lo ordiniamo
+        df_results = pd.DataFrame(results).sort_values(by="Valore complessivo", ascending=True)
 
         st.write("Tabella dei risultati:")
         st.dataframe(df_results)
@@ -176,8 +184,9 @@ def main():
         )
 
         # =============== VISUALIZZAZIONE SOLO DEI PERCORSI TROVATI ===============
-        st.subheader("Visualizzazione unicamente dei percorsi effettivamente usati")
+        st.subheader("Visualizzazione SOLO dei percorsi (con count utilizzo archi)")
 
+        # Se abbiamo un'immagine di sfondo
         if bg_image_file is not None:
             bg_image = Image.open(bg_image_file)
             x_min, x_max = df["X"].min(), df["X"].max()
@@ -193,14 +202,24 @@ def main():
                     aspect='auto',
                     origin='upper'
                 )
+
                 # Disegno SOLO gli archi del sottografo G_paths
                 for (n1, n2) in G_paths.edges():
                     x1, y1 = G_paths.nodes[n1]["x"], G_paths.nodes[n1]["y"]
                     x2, y2 = G_paths.nodes[n2]["x"], G_paths.nodes[n2]["y"]
                     ax2.plot([x1, x2], [y1, y2], color='blue', linewidth=2, alpha=0.7)
 
-                # Disegno i nodi (macchina in rosso, corridoio in verde) presenti in G_paths
-                # (In teoria ci sono tutti, ma disegniamo solo quelli con coordinate valide)
+                    # Mostriamo il numero di utilizzi (count) a metà dell'arco
+                    usage_count = G_paths[n1][n2]['count']
+                    xm = (x1 + x2) / 2
+                    ym = (y1 + y2) / 2
+                    ax2.text(xm, ym, str(usage_count),
+                             color="blue", fontsize=10,
+                             ha="center", va="center",
+                             bbox=dict(boxstyle="round,pad=0.3",
+                                       fc="white", ec="blue", alpha=0.6))
+
+                # Disegno i nodi
                 coords_corridoio = []
                 coords_macchina = []
                 for nd in G_paths.nodes():
@@ -213,22 +232,38 @@ def main():
                         elif tag == "Macchina":
                             coords_macchina.append((x_val, y_val))
 
-                # Scatter per corridoi
+                # Scatter corridoi (verde)
                 if coords_corridoio:
                     x_c, y_c = zip(*coords_corridoio)
                     ax2.scatter(x_c, y_c, c='green', marker='o', label='Corridoio')
-
-                # Scatter per macchine
+                # Scatter macchine (rosso)
                 if coords_macchina:
                     x_m, y_m = zip(*coords_macchina)
                     ax2.scatter(x_m, y_m, c='red', marker='s', label='Macchina')
 
-                ax2.set_title("Sottografo dei percorsi (Macchina - Macchina)")
+                ax2.set_title("Sottografo dei percorsi (Macchina - Macchina) con count utilizzo archi")
                 ax2.legend()
                 st.pyplot(fig2)
         else:
-            # Se non c'è immagine di sfondo, mostriamo comunque il sottografo
+            # Se non c'è immagine di sfondo, visualizziamo comunque il sottografo G_paths
             fig2, ax2 = plt.subplots(figsize=(10, 8))
+
+            # Disegno SOLO gli archi di G_paths
+            for (n1, n2) in G_paths.edges():
+                x1, y1 = G_paths.nodes[n1]["x"], G_paths.nodes[n1]["y"]
+                x2, y2 = G_paths.nodes[n2]["x"], G_paths.nodes[n2]["y"]
+                ax2.plot([x1, x2], [y1, y2], color='blue', linewidth=2, alpha=0.7)
+
+                # Numero di utilizzi
+                usage_count = G_paths[n1][n2]['count']
+                xm = (x1 + x2) / 2
+                ym = (y1 + y2) / 2
+                ax2.text(xm, ym, str(usage_count),
+                         color="blue", fontsize=10,
+                         ha="center", va="center",
+                         bbox=dict(boxstyle="round,pad=0.3",
+                                   fc="white", ec="blue", alpha=0.6))
+
             # Disegno nodi
             coords_corridoio = []
             coords_macchina = []
@@ -242,21 +277,16 @@ def main():
                     elif tag == "Macchina":
                         coords_macchina.append((x_val, y_val))
 
+            # Scatter corridoi (verde)
             if coords_corridoio:
                 x_c, y_c = zip(*coords_corridoio)
                 ax2.scatter(x_c, y_c, c='green', marker='o', label='Corridoio')
-
+            # Scatter macchine (rosso)
             if coords_macchina:
                 x_m, y_m = zip(*coords_macchina)
                 ax2.scatter(x_m, y_m, c='red', marker='s', label='Macchina')
 
-            # Disegno archi
-            for (n1, n2) in G_paths.edges():
-                x1, y1 = G_paths.nodes[n1]["x"], G_paths.nodes[n1]["y"]
-                x2, y2 = G_paths.nodes[n2]["x"], G_paths.nodes[n2]["y"]
-                ax2.plot([x1, x2], [y1, y2], color='blue', linewidth=2, alpha=0.7)
-
-            ax2.set_title("Sottografo dei percorsi (Macchina - Macchina), senza sfondo")
+            ax2.set_title("Sottografo dei percorsi (Macchina - Macchina) con count utilizzo archi")
             ax2.legend()
             st.pyplot(fig2)
 
@@ -265,6 +295,5 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 
