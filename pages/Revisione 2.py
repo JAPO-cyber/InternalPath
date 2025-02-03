@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 
 def main():
-    st.title("Grafo Corridoio-Macchina con colonna 'Size' (catena di collegamento)")
+    st.title("Grafo Corridoio-Macchina con catena per ogni punto (basata su Size)")
 
     # 1. Caricamento file Excel
     excel_file = st.file_uploader(
@@ -91,61 +91,73 @@ def main():
             w = G_corr[c1][c2]["weight"]
             G.add_edge(c1, c2, weight=w)
 
-        # ====== 2) Collegamento Macchine a Corridoi con logica a catena ======
+        # ====== 2) Collegamento Macchine a Corridoi con logica a catena per ogni punto ======
         def choose_corridor_chain(machine_idx, corridor_indices):
             """
-            Per una macchina data, sceglie in catena il collegamento ai nodi corridoio.
+            Per una macchina data, costruisce una catena di nodi corridoio basata sulla direzione indicata
+            nel campo "Size".
             
-            1. Candidate1: è il corridoio più vicino alla macchina (ignorando il campo Size).
-            2. Candidate2: se il campo Size è specificato (ad es. "Alto", "Basso", "Sinistro", "Destro"),
-               si filtrano i corridoi affinché candidate2 abbia la coordinata (Y o X) maggiore o minore di quella
-               di candidate1 (in base alla direzione) e si sceglie quello più vicino a candidate1.
-            Se non esiste un candidate2, viene restituita solo la catena con candidate1.
-            Se il campo Size è vuoto, viene restituita la catena formata da un solo nodo.
+            1. Si seleziona il nodo corridoio più vicino alla macchina (candidate1).
+            2. Se il campo "Size" è impostato (Alto, Basso, Sinistro, Destro), 
+               per ogni punto della catena si seleziona il prossimo nodo corridoio che:
+                 - Non è già stato selezionato.
+                 - Rispetta la condizione rispetto al nodo precedente:
+                     * "Alto": il nodo successivo deve avere Y maggiore del nodo precedente.
+                     * "Basso": il nodo successivo deve avere Y minore del nodo precedente.
+                     * "Sinistro": il nodo successivo deve avere X minore del nodo precedente.
+                     * "Destro": il nodo successivo deve avere X maggiore del nodo precedente.
+               Tra i nodi validi si sceglie quello più vicino al nodo corrente.
+            3. La catena termina quando non esistono ulteriori nodi validi.
+            
+            Se il campo "Size" non è impostato o è vuoto, viene restituita la catena contenente solo candidate1.
             """
+            chain = []
             # Primo candidato: il corridoio più vicino alla macchina
-            candidate1 = min(corridor_indices, key=lambda c: distance(machine_idx, c))
+            candidate = min(corridor_indices, key=lambda c: distance(machine_idx, c))
+            chain.append(candidate)
             size_val = G.nodes[machine_idx]["size"]
             if pd.isna(size_val) or size_val.strip() == "":
-                return [candidate1]
-            
-            # Per il secondo candidato, si filtra in base a candidate1
-            cand_x = G.nodes[candidate1]["x"]
-            cand_y = G.nodes[candidate1]["y"]
-            if size_val == "Alto":
-                valid = [c for c in corridor_indices if G.nodes[c]["y"] > cand_y and c != candidate1]
-            elif size_val == "Basso":
-                valid = [c for c in corridor_indices if G.nodes[c]["y"] < cand_y and c != candidate1]
-            elif size_val == "Sinistro":
-                valid = [c for c in corridor_indices if G.nodes[c]["x"] < cand_x and c != candidate1]
-            elif size_val == "Destro":
-                valid = [c for c in corridor_indices if G.nodes[c]["x"] > cand_x and c != candidate1]
-            else:
-                valid = []
-            
-            if valid:
-                candidate2 = min(valid, key=lambda c: math.dist(
-                    (G.nodes[candidate1]["x"], G.nodes[candidate1]["y"]),
-                    (G.nodes[c]["x"], G.nodes[c]["y"])
-                ))
-                return [candidate1, candidate2]
-            else:
-                return [candidate1]
+                return chain
+            # Iterativamente, scegliamo il prossimo nodo in base alla direzione
+            while True:
+                last_candidate = chain[-1]
+                if size_val == "Alto":
+                    valid = [c for c in corridor_indices if c not in chain and G.nodes[c]["y"] > G.nodes[last_candidate]["y"]]
+                elif size_val == "Basso":
+                    valid = [c for c in corridor_indices if c not in chain and G.nodes[c]["y"] < G.nodes[last_candidate]["y"]]
+                elif size_val == "Sinistro":
+                    valid = [c for c in corridor_indices if c not in chain and G.nodes[c]["x"] < G.nodes[last_candidate]["x"]]
+                elif size_val == "Destro":
+                    valid = [c for c in corridor_indices if c not in chain and G.nodes[c]["x"] > G.nodes[last_candidate]["x"]]
+                else:
+                    valid = []
+                if valid:
+                    next_candidate = min(
+                        valid,
+                        key=lambda c: math.dist(
+                            (G.nodes[last_candidate]["x"], G.nodes[last_candidate]["y"]),
+                            (G.nodes[c]["x"], G.nodes[c]["y"])
+                        )
+                    )
+                    chain.append(next_candidate)
+                else:
+                    break
+            return chain
 
-        # Per ogni macchina, si applica la logica a catena
+        # Per ogni macchina, applica la logica a catena e collega i nodi
         for idx_m in df_macchina.index:
             chain = choose_corridor_chain(idx_m, corr_indices)
             if chain:
                 # Collega la macchina al primo nodo della catena
                 w1 = distance(idx_m, chain[0])
                 G.add_edge(idx_m, chain[0], weight=w1)
-                # Se esiste il secondo nodo, collega candidate1 a candidate2
-                if len(chain) > 1:
-                    w2 = math.dist(
-                        (G.nodes[chain[0]]["x"], G.nodes[chain[0]]["y"]),
-                        (G.nodes[chain[1]]["x"], G.nodes[chain[1]]["y"])
+                # Collega ogni coppia di nodi nella catena
+                for i in range(len(chain) - 1):
+                    w = math.dist(
+                        (G.nodes[chain[i]]["x"], G.nodes[chain[i]]["y"]),
+                        (G.nodes[chain[i+1]]["x"], G.nodes[chain[i+1]]["y"])
                     )
-                    G.add_edge(chain[0], chain[1], weight=w2)
+                    G.add_edge(chain[i], chain[i+1], weight=w)
 
         st.write(f"**Nodi nel grafo**: {G.number_of_nodes()}")
         st.write(f"**Archi nel grafo**: {G.number_of_edges()}")
@@ -158,7 +170,7 @@ def main():
             st.info("Meno di due macchine, nessuna coppia da calcolare.")
             return
 
-        # Creiamo un sottografo G_paths che conterrà solo gli archi usati dai percorsi
+        # Creiamo un sottografo G_paths che contiene solo gli archi usati nei percorsi
         G_paths = nx.Graph()
         G_paths.add_nodes_from(G.nodes(data=True))
         edge_usage_count = defaultdict(int)
@@ -173,7 +185,7 @@ def main():
             # Calcola il cammino più breve (lista di nodi)
             path_nodes = nx.shortest_path(G, m1, m2, weight='weight')
 
-            # Calcola le distanze dei segmenti e incrementa il contatore per ogni arco usato
+            # Calcola le distanze dei segmenti e aggiorna il conteggio degli archi usati
             segment_distances = []
             for i in range(len(path_nodes) - 1):
                 nA = path_nodes[i]
@@ -186,7 +198,7 @@ def main():
 
             total_dist = sum(segment_distances)
 
-            # Crea le stringhe di percorso e delle distanze
+            # Crea le stringhe per il percorso e la somma delle distanze
             path_list = [G.nodes[nd]["name"] for nd in path_nodes]
             path_str = " -> ".join(path_list)
             sum_str = " + ".join(f"{d_val:.2f}" for d_val in segment_distances) + f" = {total_dist:.2f}"
@@ -224,7 +236,7 @@ def main():
         st.subheader("Visualizzazione dei percorsi effettivamente usati (con count su ciascun arco)")
 
         if bg_image_file is not None:
-            # Se è stata caricata un'immagine di sfondo, la usiamo come base
+            # Se viene caricata un'immagine di sfondo, la usiamo come base
             bg_image = Image.open(bg_image_file)
             x_min, x_max = df["X"].min(), df["X"].max()
             y_min, y_max = df["Y"].min(), df["Y"].max()
@@ -322,6 +334,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
