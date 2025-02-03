@@ -2,3 +2,6 @@ networkx
 matplotlib
 streamlit
 xlsxwriter
+pandas
+PIL
+io
