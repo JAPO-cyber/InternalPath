@@ -8,7 +8,7 @@ from PIL import Image
 import matplotlib.pyplot as plt
 
 def main():
-    st.title("Distanze tra coppie di macchine con percorso completo (start, corridoi, end)")
+    st.title("Distanze tra coppie di macchine e visualizzazione SOLO dei percorsi trovati")
 
     # 1. Caricamento file Excel
     excel_file = st.file_uploader(
@@ -101,35 +101,6 @@ def main():
         st.write(f"**Nodi nel grafo**: {G.number_of_nodes()}")
         st.write(f"**Archi nel grafo**: {G.number_of_edges()}")
 
-        # =============== VISUALIZZAZIONE OPZIONALE ===============
-        if bg_image_file is not None:
-            bg_image = Image.open(bg_image_file)
-            x_min, x_max = df["X"].min(), df["X"].max()
-            y_min, y_max = df["Y"].min(), df["Y"].max()
-
-            if pd.isna(x_min) or pd.isna(x_max) or pd.isna(y_min) or pd.isna(y_max):
-                st.warning("Coordinate X e/o Y non valide, impossibile mostrare l'immagine di sfondo.")
-            else:
-                fig, ax = plt.subplots(figsize=(10, 8))
-                ax.imshow(
-                    bg_image,
-                    extent=[x_min, x_max, y_min, y_max],
-                    aspect='auto',
-                    origin='upper'
-                )
-                # Disegno archi (blu)
-                for (n1, n2) in G.edges():
-                    x1, y1 = G.nodes[n1]["x"], G.nodes[n1]["y"]
-                    x2, y2 = G.nodes[n2]["x"], G.nodes[n2]["y"]
-                    ax.plot([x1, x2], [y1, y2], color='blue', linewidth=1, alpha=0.5)
-
-                # Disegno punti: Corridoio in verde, Macchina in rosso
-                ax.scatter(df_corridoio["X"], df_corridoio["Y"], c='green', marker='o', label='Corridoio')
-                ax.scatter(df_macchina["X"], df_macchina["Y"], c='red', marker='s', label='Macchina')
-                ax.set_title("Visualizzazione del grafo (con sfondo)")
-                ax.legend()
-                st.pyplot(fig)
-
         # =============== CALCOLO DISTANZE COPPIE (SENZA ORDINE) ===============
         st.subheader("Distanze tra coppie di macchine (con percorso completo)")
 
@@ -140,6 +111,11 @@ def main():
 
         pairs = itertools.combinations(machine_indices, 2)
         results = []
+
+        # Creiamo un sottografo che conterrà solo gli archi effettivamente usati dai percorsi
+        G_paths = nx.Graph()
+        # Aggiunge tutti i nodi con i loro attributi (così abbiamo coordinate e nome)
+        G_paths.add_nodes_from(G.nodes(data=True))
 
         for (m1, m2) in pairs:
             name1 = G.nodes[m1]["name"]
@@ -156,16 +132,18 @@ def main():
                 dist_seg = G[nA][nB]['weight']
                 segment_distances.append(dist_seg)
 
+                # Aggiungiamo quest'arco al sottografo G_paths
+                if not G_paths.has_edge(nA, nB):
+                    G_paths.add_edge(nA, nB, weight=dist_seg)
+
             # Somma totale
             total_dist = sum(segment_distances)
 
             # Costruisci la stringa con TUTTO il percorso (macchina iniziale, eventuali corridoi, macchina finale)
             path_list = [G.nodes[nd]["name"] for nd in path_nodes]
-            # Es: "MacchinaA -> Corr1 -> Corr2 -> MacchinaB"
             path_str = " -> ".join(path_list)
 
             # Crea la stringa delle distanze
-            # Es: "3.45 + 2.10 + 5.00 = 10.55"
             sum_str = " + ".join(f"{dist_val:.2f}" for dist_val in segment_distances)
             sum_str += f" = {total_dist:.2f}"
 
@@ -196,6 +174,91 @@ def main():
             file_name="distanze_coppie_macchine.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+
+        # =============== VISUALIZZAZIONE SOLO DEI PERCORSI TROVATI ===============
+        st.subheader("Visualizzazione unicamente dei percorsi effettivamente usati")
+
+        if bg_image_file is not None:
+            bg_image = Image.open(bg_image_file)
+            x_min, x_max = df["X"].min(), df["X"].max()
+            y_min, y_max = df["Y"].min(), df["Y"].max()
+
+            if pd.isna(x_min) or pd.isna(x_max) or pd.isna(y_min) or pd.isna(y_max):
+                st.warning("Coordinate X e/o Y non valide, impossibile mostrare l'immagine di sfondo.")
+            else:
+                fig2, ax2 = plt.subplots(figsize=(10, 8))
+                ax2.imshow(
+                    bg_image,
+                    extent=[x_min, x_max, y_min, y_max],
+                    aspect='auto',
+                    origin='upper'
+                )
+                # Disegno SOLO gli archi del sottografo G_paths
+                for (n1, n2) in G_paths.edges():
+                    x1, y1 = G_paths.nodes[n1]["x"], G_paths.nodes[n1]["y"]
+                    x2, y2 = G_paths.nodes[n2]["x"], G_paths.nodes[n2]["y"]
+                    ax2.plot([x1, x2], [y1, y2], color='blue', linewidth=2, alpha=0.7)
+
+                # Disegno i nodi (macchina in rosso, corridoio in verde) presenti in G_paths
+                # (In teoria ci sono tutti, ma disegniamo solo quelli con coordinate valide)
+                coords_corridoio = []
+                coords_macchina = []
+                for nd in G_paths.nodes():
+                    tag = G_paths.nodes[nd]["tag"]
+                    x_val = G_paths.nodes[nd]["x"]
+                    y_val = G_paths.nodes[nd]["y"]
+                    if pd.notna(x_val) and pd.notna(y_val):
+                        if tag == "Corridoio":
+                            coords_corridoio.append((x_val, y_val))
+                        elif tag == "Macchina":
+                            coords_macchina.append((x_val, y_val))
+
+                # Scatter per corridoi
+                if coords_corridoio:
+                    x_c, y_c = zip(*coords_corridoio)
+                    ax2.scatter(x_c, y_c, c='green', marker='o', label='Corridoio')
+
+                # Scatter per macchine
+                if coords_macchina:
+                    x_m, y_m = zip(*coords_macchina)
+                    ax2.scatter(x_m, y_m, c='red', marker='s', label='Macchina')
+
+                ax2.set_title("Sottografo dei percorsi (Macchina - Macchina)")
+                ax2.legend()
+                st.pyplot(fig2)
+        else:
+            # Se non c'è immagine di sfondo, mostriamo comunque il sottografo
+            fig2, ax2 = plt.subplots(figsize=(10, 8))
+            # Disegno nodi
+            coords_corridoio = []
+            coords_macchina = []
+            for nd in G_paths.nodes():
+                tag = G_paths.nodes[nd]["tag"]
+                x_val = G_paths.nodes[nd]["x"]
+                y_val = G_paths.nodes[nd]["y"]
+                if pd.notna(x_val) and pd.notna(y_val):
+                    if tag == "Corridoio":
+                        coords_corridoio.append((x_val, y_val))
+                    elif tag == "Macchina":
+                        coords_macchina.append((x_val, y_val))
+
+            if coords_corridoio:
+                x_c, y_c = zip(*coords_corridoio)
+                ax2.scatter(x_c, y_c, c='green', marker='o', label='Corridoio')
+
+            if coords_macchina:
+                x_m, y_m = zip(*coords_macchina)
+                ax2.scatter(x_m, y_m, c='red', marker='s', label='Macchina')
+
+            # Disegno archi
+            for (n1, n2) in G_paths.edges():
+                x1, y1 = G_paths.nodes[n1]["x"], G_paths.nodes[n1]["y"]
+                x2, y2 = G_paths.nodes[n2]["x"], G_paths.nodes[n2]["y"]
+                ax2.plot([x1, x2], [y1, y2], color='blue', linewidth=2, alpha=0.7)
+
+            ax2.set_title("Sottografo dei percorsi (Macchina - Macchina), senza sfondo")
+            ax2.legend()
+            st.pyplot(fig2)
 
     else:
         st.write("Carica un file Excel per iniziare.")
