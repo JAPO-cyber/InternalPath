@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 
 def main():
-    st.title("Grafo Corridoio-Macchina con colonna 'Size' (percorso diretto basato su direzione)")
+    st.title("Grafo Corridoio-Macchina con colonna 'Size' (scelta del corridoio basata sulla direzione)")
 
     # 1. Caricamento file Excel
     excel_file = st.file_uploader(
@@ -55,7 +55,7 @@ def main():
         # Creazione grafo principale
         G = nx.Graph()
 
-        # Aggiunge tutti i nodi (corridoio e macchina) con i relativi attributi
+        # Aggiunge tutti i nodi (corridoi e macchine) con i relativi attributi
         for idx, row in df.iterrows():
             G.add_node(
                 idx,
@@ -63,7 +63,7 @@ def main():
                 y=row["Y"],
                 tag=row["Tag"],
                 name=row["Entity Name"],
-                size=row.get("Size", None)  # Valori possibili: "Sinistro", "Destro", "Alto", "Basso", o vuoto
+                size=row.get("Size", None)  # Possibili valori: "Sinistro", "Destro", "Alto", "Basso" o vuoto
             )
 
         # Funzione per calcolare la distanza euclidea tra due nodi
@@ -91,110 +91,43 @@ def main():
             w = G_corr[c1][c2]["weight"]
             G.add_edge(c1, c2, weight=w)
 
-        # ====== 2) Collegamento Macchine a Corridoi (usando la direzione specificata in Size) ======
-
-        def filtra_corridoi_per_size(machine_idx, corridor_indices):
-            """
-            Ritorna i corridoi 'validi' in base al valore di 'Size' della macchina.
-            Se Size = 'Sinistro', ritorna i corridoi con X < machine.X, ecc.
-            Se Size è vuoto/NaN, non si applica il filtro (tutti validi).
-            """
-            size_val = G.nodes[machine_idx]["size"]
-            mx, my = G.nodes[machine_idx]["x"], G.nodes[machine_idx]["y"]
-
-            if pd.isna(size_val) or size_val.strip() == "":
-                return corridor_indices
-
-            filtered = []
-            for c_idx in corridor_indices:
-                cx, cy = G.nodes[c_idx]["x"], G.nodes[c_idx]["y"]
-
-                if size_val == "Sinistro" and cx < mx:
-                    filtered.append(c_idx)
-                elif size_val == "Destro" and cx > mx:
-                    filtered.append(c_idx)
-                elif size_val == "Alto" and cy > my:
-                    filtered.append(c_idx)
-                elif size_val == "Basso" and cy < my:
-                    filtered.append(c_idx)
-            return filtered
-
+        # ====== 2) Collegamento Macchine a Corridoi ======
         def choose_corridor(machine_idx, corridor_indices):
             """
-            Se per la macchina (machine_idx) è specificata una direzione (Size),
-            sceglie il corridoio che massimizza lo scostamento nella direzione desiderata.
-            In caso di Size non specificato (o se nessun corridoio soddisfa la condizione),
-            sceglie il corridoio con distanza euclidea minima.
-            Ritorna una tupla (corridor_idx, distanza).
+            Per una macchina data, sceglie un corridoio in base alla direzione specificata nel campo "Size".
+            
+            - Se "Alto": sceglie il corridoio con il valore massimo di Y.
+            - Se "Basso": sceglie il corridoio con il valore minimo di Y.
+            - Se "Sinistro": sceglie il corridoio con il valore minimo di X.
+            - Se "Destro": sceglie il corridoio con il valore massimo di X.
+            
+            Se il campo "Size" non è specificato o contiene un valore inatteso, si usa il corridoio più vicino
+            secondo la distanza euclidea dalla macchina.
             """
             size_val = G.nodes[machine_idx]["size"]
 
-            # Se Size non è specificato, usa il criterio della distanza minima
+            # Se Size non è specificato o vuoto, usa la distanza euclidea minima.
             if pd.isna(size_val) or size_val.strip() == "":
-                best_corr = None
-                best_dist = float("inf")
-                for c in corridor_indices:
-                    d = distance(machine_idx, c)
-                    if d < best_dist:
-                        best_dist = d
-                        best_corr = c
+                best_corr = min(corridor_indices, key=lambda c: distance(machine_idx, c))
+                best_dist = distance(machine_idx, best_corr)
                 return best_corr, best_dist
 
-            # Applica il filtro direzionale
-            candidates = filtra_corridoi_per_size(machine_idx, corridor_indices)
-            # Se non ci sono candidati, si usa il fallback: tutti i corridoi
-            if not candidates:
-                candidates = corridor_indices
-
-            # Se la direzione è specificata, scegli in base allo scostamento
-            if size_val == "Sinistro":
-                best_corr = None
-                best_value = -float("inf")
-                for c in candidates:
-                    diff = G.nodes[machine_idx]["x"] - G.nodes[c]["x"]  # Positivo se c è a sinistra
-                    if diff > best_value:
-                        best_value = diff
-                        best_corr = c
-            elif size_val == "Destro":
-                best_corr = None
-                best_value = -float("inf")
-                for c in candidates:
-                    diff = G.nodes[c]["x"] - G.nodes[machine_idx]["x"]  # Positivo se c è a destra
-                    if diff > best_value:
-                        best_value = diff
-                        best_corr = c
-            elif size_val == "Alto":
-                best_corr = None
-                best_value = -float("inf")
-                for c in candidates:
-                    diff = G.nodes[c]["y"] - G.nodes[machine_idx]["y"]  # Positivo se c è sopra
-                    if diff > best_value:
-                        best_value = diff
-                        best_corr = c
+            if size_val == "Alto":
+                best_corr = max(corridor_indices, key=lambda c: G.nodes[c]["y"])
             elif size_val == "Basso":
-                best_corr = None
-                best_value = -float("inf")
-                for c in candidates:
-                    diff = G.nodes[machine_idx]["y"] - G.nodes[c]["y"]  # Positivo se c è sotto
-                    if diff > best_value:
-                        best_value = diff
-                        best_corr = c
+                best_corr = min(corridor_indices, key=lambda c: G.nodes[c]["y"])
+            elif size_val == "Sinistro":
+                best_corr = min(corridor_indices, key=lambda c: G.nodes[c]["x"])
+            elif size_val == "Destro":
+                best_corr = max(corridor_indices, key=lambda c: G.nodes[c]["x"])
             else:
-                # In caso di valore inatteso, si usa il criterio distanza minima
-                best_corr = None
-                best_dist = float("inf")
-                for c in candidates:
-                    d = distance(machine_idx, c)
-                    if d < best_dist:
-                        best_dist = d
-                        best_corr = c
-                return best_corr, best_dist
-
-            # Calcola la distanza per completezza (utile anche per il weight dell'arco)
+                # Se Size contiene un valore inatteso, usa la distanza minima
+                best_corr = min(corridor_indices, key=lambda c: distance(machine_idx, c))
+            
             best_dist = distance(machine_idx, best_corr)
             return best_corr, best_dist
 
-        # Per ogni macchina, collega al corridoio scelto usando la funzione sopra
+        # Per ogni macchina, collega al corridoio scelto utilizzando la funzione choose_corridor
         for idx_m in df_macchina.index:
             best_corr, best_dist = choose_corridor(idx_m, corr_indices)
             if best_corr is not None:
@@ -211,7 +144,7 @@ def main():
             st.info("Meno di due macchine, nessuna coppia da calcolare.")
             return
 
-        # Creiamo un sottografo G_paths che conterrà solo gli archi utilizzati dai percorsi
+        # Creiamo un sottografo G_paths che conterrà solo gli archi usati dai percorsi
         G_paths = nx.Graph()
         G_paths.add_nodes_from(G.nodes(data=True))
         edge_usage_count = defaultdict(int)
