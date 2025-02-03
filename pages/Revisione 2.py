@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 
 def main():
-    st.title("Grafo Corridoio-Macchina con catena per ogni punto (basata su Size)")
+    st.title("Grafo Corridoio-Macchina con catena (filtrata ad ogni step in base a Size)")
 
     # 1. Caricamento file Excel
     excel_file = st.file_uploader(
@@ -26,18 +26,17 @@ def main():
     if excel_file is not None:
         # Legge il DataFrame
         df = pd.read_excel(excel_file)
-
         st.subheader("Anteprima del DataFrame caricato")
         st.dataframe(df.head())
 
-        # Verifica le colonne necessarie
+        # Verifica la presenza delle colonne necessarie
         needed_cols = ["X", "Y", "Tag", "Entity Name", "Size"]
         for c in needed_cols:
             if c not in df.columns:
                 st.error(f"Colonna '{c}' mancante nel file Excel.")
                 return
 
-        # Converte X, Y in valori numerici
+        # Converte X e Y in valori numerici
         df["X"] = pd.to_numeric(df["X"], errors="coerce")
         df["Y"] = pd.to_numeric(df["Y"], errors="coerce")
 
@@ -51,7 +50,7 @@ def main():
         if df_macchina.empty:
             st.warning("Non ci sono macchine: non ci sono coppie da calcolare.")
 
-        # Crea il grafo principale e aggiunge i nodi con i loro attributi
+        # Crea il grafo principale e aggiunge tutti i nodi con relativi attributi
         G = nx.Graph()
         for idx, row in df.iterrows():
             G.add_node(
@@ -63,7 +62,7 @@ def main():
                 size=row.get("Size", None)
             )
 
-        # Funzione per la distanza euclidea
+        # Funzione per calcolare la distanza euclidea
         def distance(n1, n2):
             x1, y1 = G.nodes[n1]["x"], G.nodes[n1]["y"]
             x2, y2 = G.nodes[n2]["x"], G.nodes[n2]["y"]
@@ -81,74 +80,61 @@ def main():
                 G_corr.add_edge(n1, n2, weight=d)
         mst_corridoi = nx.minimum_spanning_tree(G_corr, weight='weight')
         for (c1, c2) in mst_corridoi.edges():
-            w = G_corr[c1][c2]["weight"]
-            G.add_edge(c1, c2, weight=w)
+            G.add_edge(c1, c2, weight=G_corr[c1][c2]["weight"])
 
-        # ====== 2) Collegamento Macchine a Corridoi con la logica a catena ======
-        # First, a helper function to select the first candidate strictly by the direction
-        def choose_first_candidate(machine_idx, corridor_indices):
+        # ====== 2) Collegamento Macchine a Corridoi con catena (filtrata ad ogni step) ======
+        def choose_corridor_chain(machine_idx, corridor_indices):
+            """
+            For a given machine, build the chain of corridor nodes as follows:
+              1. Based on the machine's Size value, filter corridor nodes with respect to the machine’s coordinates.
+                 For example, if Size is "destro" then only keep corridors with x > machine.x.
+              2. Sort the filtered corridors according to the relevant coordinate:
+                 - "destro": increasing x
+                 - "sinistro": decreasing x
+                 - "alto": increasing y
+                 - "basso": decreasing y
+              3. Return the sorted list as the chain.
+            If Size is empty, return the single nearest corridor (without filtering).
+            """
             size_val = G.nodes[machine_idx]["size"]
-            # Use lower-case and strip to standardize
+            # Normalize the size value (trim spaces and lower-case)
             direction = size_val.strip().lower() if isinstance(size_val, str) else ""
+            if direction == "":
+                # No directional condition: simply return the nearest corridor as a single-element chain.
+                candidate = min(corridor_indices, key=lambda c: distance(machine_idx, c))
+                return [candidate]
+            # Get the machine's coordinates.
             machine_x = G.nodes[machine_idx]["x"]
             machine_y = G.nodes[machine_idx]["y"]
-            if direction == "":
-                return min(corridor_indices, key=lambda c: distance(machine_idx, c))
-            if direction == "alto":
-                valid = [c for c in corridor_indices if G.nodes[c]["y"] > machine_y]
-            elif direction == "basso":
-                valid = [c for c in corridor_indices if G.nodes[c]["y"] < machine_y]
+            # Filter corridors according to the directional condition relative to the machine.
+            if direction == "destro":
+                valid = [c for c in corridor_indices if G.nodes[c]["x"] > machine_x]
+                # Sort in increasing order of x.
+                sorted_valid = sorted(valid, key=lambda c: G.nodes[c]["x"])
             elif direction == "sinistro":
                 valid = [c for c in corridor_indices if G.nodes[c]["x"] < machine_x]
-            elif direction == "destro":
-                valid = [c for c in corridor_indices if G.nodes[c]["x"] > machine_x]
+                # Sort in decreasing order of x.
+                sorted_valid = sorted(valid, key=lambda c: G.nodes[c]["x"], reverse=True)
+            elif direction == "alto":
+                valid = [c for c in corridor_indices if G.nodes[c]["y"] > machine_y]
+                # Sort in increasing order of y.
+                sorted_valid = sorted(valid, key=lambda c: G.nodes[c]["y"])
+            elif direction == "basso":
+                valid = [c for c in corridor_indices if G.nodes[c]["y"] < machine_y]
+                # Sort in decreasing order of y.
+                sorted_valid = sorted(valid, key=lambda c: G.nodes[c]["y"], reverse=True)
             else:
-                valid = []
-            if valid:
-                return min(valid, key=lambda c: distance(machine_idx, c))
-            else:
-                return None  # Do not fallback
+                sorted_valid = []
+            return sorted_valid
 
-        # Then, the chain builder function
-        def choose_corridor_chain(machine_idx, corridor_indices):
-            chain = []
-            candidate = choose_first_candidate(machine_idx, corridor_indices)
-            if candidate is None:
-                return chain  # no candidate found that meets the directional condition
-            chain.append(candidate)
-            size_val = G.nodes[machine_idx]["size"]
-            direction = size_val.strip().lower() if isinstance(size_val, str) else ""
-            if direction == "":
-                return chain
-            while True:
-                last_candidate = chain[-1]
-                # Apply the directional condition relative to the last candidate:
-                if direction == "alto":
-                    valid = [c for c in corridor_indices if c not in chain and G.nodes[c]["y"] > G.nodes[last_candidate]["y"]]
-                elif direction == "basso":
-                    valid = [c for c in corridor_indices if c not in chain and G.nodes[c]["y"] < G.nodes[last_candidate]["y"]]
-                elif direction == "sinistro":
-                    valid = [c for c in corridor_indices if c not in chain and G.nodes[c]["x"] < G.nodes[last_candidate]["x"]]
-                elif direction == "destro":
-                    valid = [c for c in corridor_indices if c not in chain and G.nodes[c]["x"] > G.nodes[last_candidate]["x"]]
-                else:
-                    valid = []
-                if not valid:
-                    break
-                next_candidate = min(valid,
-                                     key=lambda c: math.dist(
-                                         (G.nodes[last_candidate]["x"], G.nodes[last_candidate]["y"]),
-                                         (G.nodes[c]["x"], G.nodes[c]["y"])
-                                     ))
-                chain.append(next_candidate)
-            return chain
-
-        # Connect each machine using the chain (if a valid chain is found)
+        # For each machine, get the chain and add edges:
         for idx_m in df_macchina.index:
             chain = choose_corridor_chain(idx_m, corr_indices)
             if chain:
+                # Connect the machine to the first candidate in the chain.
                 w1 = distance(idx_m, chain[0])
                 G.add_edge(idx_m, chain[0], weight=w1)
+                # Connect each candidate in the chain sequentially.
                 for i in range(len(chain) - 1):
                     w = math.dist((G.nodes[chain[i]]["x"], G.nodes[chain[i]]["y"]),
                                   (G.nodes[chain[i+1]]["x"], G.nodes[chain[i+1]]["y"]))
@@ -209,6 +195,7 @@ def main():
             file_name="distanze_coppie_macchine.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+
         # ====== 4) Visualizzazione del sottografo G_paths ======
         st.subheader("Visualizzazione dei percorsi effettivamente usati (con count su ciascun arco)")
         if bg_image_file is not None:
@@ -219,7 +206,8 @@ def main():
                 st.warning("Coordinate X/Y non valide, impossibile mostrare l'immagine di sfondo.")
             else:
                 fig2, ax2 = plt.subplots(figsize=(10, 8))
-                ax2.imshow(bg_image, extent=[x_min, x_max, y_min, y_max], aspect='auto', origin='upper')
+                ax2.imshow(bg_image, extent=[x_min, x_max, y_min, y_max],
+                           aspect='auto', origin='upper')
                 for (n1, n2) in G_paths.edges():
                     x1, y1 = G_paths.nodes[n1]["x"], G_paths.nodes[n1]["y"]
                     x2, y2 = G_paths.nodes[n2]["x"], G_paths.nodes[n2]["y"]
@@ -287,3 +275,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
