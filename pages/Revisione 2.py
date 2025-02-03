@@ -119,22 +119,24 @@ def main():
             """
             chain = []
             size_val = G.nodes[machine_idx]["size"]
+            
+            # Use a stripped version of size_val to avoid trailing/leading spaces issues
+            direction = size_val.strip() if isinstance(size_val, str) else ""
 
             # --- Se il campo Size è impostato, applica il filtro per il primo candidato ---
-            if pd.isna(size_val) or size_val.strip() == "":
-                # Nessun filtro direzionale, candidate è il più vicino alla macchina
+            if direction == "":
+                # Nessun filtro direzionale: candidato è il più vicino alla macchina
                 candidate = min(corridor_indices, key=lambda c: distance(machine_idx, c))
             else:
-                # Filtra i nodi corridoio in base alla posizione della macchina
                 machine_x = G.nodes[machine_idx]["x"]
                 machine_y = G.nodes[machine_idx]["y"]
-                if size_val == "Alto":
+                if direction == "Alto":
                     valid_first = [c for c in corridor_indices if G.nodes[c]["y"] > machine_y]
-                elif size_val == "Basso":
+                elif direction == "Basso":
                     valid_first = [c for c in corridor_indices if G.nodes[c]["y"] < machine_y]
-                elif size_val == "Sinistro":
+                elif direction == "Sinistro":
                     valid_first = [c for c in corridor_indices if G.nodes[c]["x"] < machine_x]
-                elif size_val == "Destro":
+                elif direction == "Destro":
                     valid_first = [c for c in corridor_indices if G.nodes[c]["x"] > machine_x]
                 else:
                     valid_first = corridor_indices
@@ -147,18 +149,18 @@ def main():
             chain.append(candidate)
             
             # --- Ora, per ogni successivo nodo della catena, applica il filtro relativo al nodo corrente ---
-            if pd.isna(size_val) or size_val.strip() == "":
-                return chain  # Nessuna direzione richiesta, restituisci solo il primo candidato
+            if direction == "":
+                return chain  # Nessuna direzione richiesta, restituisce solo il primo candidato
 
             while True:
                 last_candidate = chain[-1]
-                if size_val == "Alto":
+                if direction == "Alto":
                     valid = [c for c in corridor_indices if c not in chain and G.nodes[c]["y"] > G.nodes[last_candidate]["y"]]
-                elif size_val == "Basso":
+                elif direction == "Basso":
                     valid = [c for c in corridor_indices if c not in chain and G.nodes[c]["y"] < G.nodes[last_candidate]["y"]]
-                elif size_val == "Sinistro":
+                elif direction == "Sinistro":
                     valid = [c for c in corridor_indices if c not in chain and G.nodes[c]["x"] < G.nodes[last_candidate]["x"]]
-                elif size_val == "Destro":
+                elif direction == "Destro":
                     valid = [c for c in corridor_indices if c not in chain and G.nodes[c]["x"] > G.nodes[last_candidate]["x"]]
                 else:
                     valid = []
@@ -365,6 +367,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
