@@ -94,38 +94,54 @@ def main():
         # ====== 2) Collegamento Macchine a Corridoi ======
         def choose_corridor(machine_idx, corridor_indices):
             """
-            Per una macchina data, sceglie un corridoio in base alla direzione specificata nel campo "Size".
+            Per una macchina data, sceglie il corridoio in base alla direzione indicata nel campo "Size".
             
-            - Se "Alto": sceglie il corridoio con il valore massimo di Y.
-            - Se "Basso": sceglie il corridoio con il valore minimo di Y.
-            - Se "Sinistro": sceglie il corridoio con il valore minimo di X.
-            - Se "Destro": sceglie il corridoio con il valore massimo di X.
+            Il procedimento è il seguente:
+            1. Si individua il corridoio candidato più vicino (ignorando il campo Size).
+            2. In base a "Size":
+               - Se "Alto": si considerano solo i corridoi con Y maggiore di quella del candidato.
+               - Se "Basso": si considerano solo i corridoi con Y minore di quella del candidato.
+               - Se "Sinistro": si considerano solo i corridoi con X minore di quella del candidato.
+               - Se "Destro": si considerano solo i corridoi con X maggiore di quella del candidato.
+            3. Tra i corridoi validi (se esistono) si sceglie quello più vicino (in distanza euclidea) alla macchina.
+            4. Se nessun corridoio soddisfa la condizione, si usa il candidato iniziale.
             
-            Se il campo "Size" non è specificato o contiene un valore inatteso, si usa il corridoio più vicino
-            secondo la distanza euclidea dalla macchina.
+            Se il campo "Size" non è specificato o è vuoto, si usa il candidato basato sulla distanza minima.
             """
-            size_val = G.nodes[machine_idx]["size"]
-
-            # Se Size non è specificato o vuoto, usa la distanza euclidea minima.
-            if pd.isna(size_val) or size_val.strip() == "":
-                best_corr = min(corridor_indices, key=lambda c: distance(machine_idx, c))
-                best_dist = distance(machine_idx, best_corr)
-                return best_corr, best_dist
-
-            if size_val == "Alto":
-                best_corr = max(corridor_indices, key=lambda c: G.nodes[c]["y"])
-            elif size_val == "Basso":
-                best_corr = min(corridor_indices, key=lambda c: G.nodes[c]["y"])
-            elif size_val == "Sinistro":
-                best_corr = min(corridor_indices, key=lambda c: G.nodes[c]["x"])
-            elif size_val == "Destro":
-                best_corr = max(corridor_indices, key=lambda c: G.nodes[c]["x"])
-            else:
-                # Se Size contiene un valore inatteso, usa la distanza minima
-                best_corr = min(corridor_indices, key=lambda c: distance(machine_idx, c))
+            # Primo candidato: corridoio più vicino (senza considerare Size)
+            candidate = min(corridor_indices, key=lambda c: distance(machine_idx, c))
             
-            best_dist = distance(machine_idx, best_corr)
-            return best_corr, best_dist
+            size_val = G.nodes[machine_idx]["size"]
+            # Se Size non è specificato o vuoto, ritorna il candidato
+            if pd.isna(size_val) or size_val.strip() == "":
+                return candidate, distance(machine_idx, candidate)
+            
+            # Imposta il filtro in base al candidato
+            cand_x = G.nodes[candidate]["x"]
+            cand_y = G.nodes[candidate]["y"]
+            
+            if size_val == "Alto":
+                # Considera solo corridoi con Y maggiore di quella del candidato
+                valid = [c for c in corridor_indices if G.nodes[c]["y"] > cand_y]
+            elif size_val == "Basso":
+                # Considera solo corridoi con Y minore di quella del candidato
+                valid = [c for c in corridor_indices if G.nodes[c]["y"] < cand_y]
+            elif size_val == "Sinistro":
+                # Considera solo corridoi con X minore di quella del candidato
+                valid = [c for c in corridor_indices if G.nodes[c]["x"] < cand_x]
+            elif size_val == "Destro":
+                # Considera solo corridoi con X maggiore di quella del candidato
+                valid = [c for c in corridor_indices if G.nodes[c]["x"] > cand_x]
+            else:
+                valid = corridor_indices
+            
+            # Se esistono corridoi che soddisfano la condizione, ne sceglie il più vicino
+            if valid:
+                best_corr = min(valid, key=lambda c: distance(machine_idx, c))
+            else:
+                best_corr = candidate
+            
+            return best_corr, distance(machine_idx, best_corr)
 
         # Per ogni macchina, collega al corridoio scelto utilizzando la funzione choose_corridor
         for idx_m in df_macchina.index:
@@ -308,5 +324,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
