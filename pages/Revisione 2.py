@@ -192,5 +192,18 @@ def main():
         # ========== Bottone per scaricare l'Excel ==========
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df_results.to_excel(writer, index=False, sheet_name="
+            df_results.to_excel(writer, index=False, sheet_name="Distanze_coppie")
+        excel_data = output.getvalue()
+
+        st.download_button(
+            label="Scarica risultati in Excel",
+            data=excel_data,
+            file_name="distanze_coppie_macchine.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    else:
+        st.write("Carica un file Excel per iniziare.")
+
+if __name__ == "__main__":
+    main()
 
