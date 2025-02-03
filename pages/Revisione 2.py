@@ -86,23 +86,22 @@ def main():
         # Add all machine nodes to H (with attributes)
         for idx in df_macchina.index:
             H.add_node(idx, **G.nodes[idx])
-        # Also add corridor nodes later as they appear in the chains.
+        # (Corridor nodes will be added as they appear in the chains.)
         
         def choose_corridor_chain(machine_idx, corridor_indices):
             """
-            For the given machine, build a chain of corridor nodes as follows:
-              - For the first candidate, filter corridor nodes (only corridors, not machine nodes)
-                using the machine’s coordinate and the Size condition.
-                For example, if Size is "destro", keep only corridors with x > machine.x.
-              - Then, for subsequent candidates, filter using the previously chosen corridor node.
-              - Return the list (chain) of corridor nodes.
-            If no corridor satisfies the constraint for the first candidate, return an empty list.
+            For the given machine, build a chain of corridor nodes by applying the directional constraint at every step.
+            
+            For the first candidate, filter corridor nodes using the machine’s coordinate and Size condition.
+            Then, for subsequent candidates, filter using the previously chosen corridor node.
+            If no candidate is found for the first step, return an empty list.
             """
             size_val = G.nodes[machine_idx]["size"]
             direction = size_val.strip().lower() if isinstance(size_val, str) else ""
             machine_x = G.nodes[machine_idx]["x"]
             machine_y = G.nodes[machine_idx]["y"]
             chain = []
+            
             if direction == "destro":
                 valid_first = [c for c in corridor_indices if G.nodes[c]["x"] > machine_x]
                 sorted_first = sorted(valid_first, key=lambda c: G.nodes[c]["x"])
@@ -116,16 +115,15 @@ def main():
                 valid_first = [c for c in corridor_indices if G.nodes[c]["y"] < machine_y]
                 sorted_first = sorted(valid_first, key=lambda c: G.nodes[c]["y"], reverse=True)
             else:
-                # No constraint—return the single nearest corridor
+                # No directional constraint: return the single nearest corridor.
                 candidate = min(corridor_indices, key=lambda c: distance(machine_idx, c))
                 return [candidate]
             
             if not sorted_first:
-                return []  # no corridor satisfies the machine constraint
+                return []  # no valid candidate for the machine
             
             chain.append(sorted_first[0])
             last = sorted_first[0]
-            # Extend chain by filtering relative to the last corridor node.
             while True:
                 if direction == "destro":
                     valid_next = [c for c in corridor_indices if G.nodes[c]["x"] > G.nodes[last]["x"]]
@@ -142,7 +140,6 @@ def main():
                 else:
                     valid_next = []
                 
-                # Exclude already chosen corridors
                 valid_next = [c for c in valid_next if c not in chain]
                 if not valid_next:
                     break
@@ -150,37 +147,33 @@ def main():
                 last = valid_next[0]
             return chain
         
-        # For each machine, compute its constrained chain and add edges to H.
+        # For each machine, compute its constrained chain and add corresponding edges to H.
         for idx_m in df_macchina.index:
             chain = choose_corridor_chain(idx_m, corr_indices)
             if chain:
-                # Add the corridor nodes (if not already present) to H.
                 for c in chain:
                     if c not in H:
                         H.add_node(c, **G.nodes[c])
-                # Connect machine to the first corridor in its chain.
                 w1 = distance(idx_m, chain[0])
                 H.add_edge(idx_m, chain[0], weight=w1)
-                # Connect the corridor chain sequentially.
                 for i in range(len(chain) - 1):
                     w = distance(chain[i], chain[i+1])
                     H.add_edge(chain[i], chain[i+1], weight=w)
             else:
                 st.write(f"Nessun nodo corridoio soddisfa il filtro per la macchina '{G.nodes[idx_m]['name']}' con Size '{G.nodes[idx_m]['size']}'.")
 
-        st.write(f"**Nodi nel grafo principale G**: {G.number_of_nodes()}")
-        st.write(f"**Archi nel grafo principale G**: {G.number_of_edges()}")
-        st.write(f"**Nodi nel grafo H (constrained edges)**: {H.number_of_nodes()}")
-        st.write(f"**Archi nel grafo H (constrained edges)**: {H.number_of_edges()}")
+        st.write(f"**Nodi in G**: {G.number_of_nodes()}")
+        st.write(f"**Archi in G**: {G.number_of_edges()}")
+        st.write(f"**Nodi in H (constrained edges)**: {H.number_of_nodes()}")
+        st.write(f"**Archi in H (constrained edges)**: {H.number_of_edges()}")
         
-        # --- 3) Compute shortest paths between machines using graph H ---
-        st.subheader("Distanze tra coppie di macchine (usando solo i vincoli Size)")
+        # --- 3) Compute shortest paths between machines using H ---
+        st.subheader("Distanze tra coppie di macchine (usando solo vincoli Size)")
         machine_indices = df_macchina.index.tolist()
         if len(machine_indices) < 2:
             st.info("Meno di due macchine, nessuna coppia da calcolare.")
             return
         
-        # Compute shortest path on H (which includes only our constrained edges)
         results = []
         edge_usage_count = defaultdict(int)
         for m1, m2 in itertools.combinations(machine_indices, 2):
@@ -203,9 +196,14 @@ def main():
                 "Somma distanze (stringa)": " + ".join(f"{d:.2f}" for d in seg_dists) + f" = {tot_d:.2f}",
                 "Valore complessivo": tot_d
             })
-        df_results = pd.DataFrame(results).sort_values(by="Valore complessivo", ascending=True)
+        
+        # Build results DataFrame; check for key before sorting
+        df_results = pd.DataFrame(results)
+        if not df_results.empty and "Valore complessivo" in df_results.columns:
+            df_results = df_results.sort_values(by="Valore complessivo", ascending=True)
         st.write("Tabella dei risultati (usando solo i vincoli Size):")
         st.dataframe(df_results)
+        
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             df_results.to_excel(writer, index=False, sheet_name="Distanze_coppie")
@@ -216,7 +214,7 @@ def main():
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
         
-        # --- 4) Visualization of the constrained subgraph H ---
+        # --- 4) Visualization of constrained subgraph H ---
         st.subheader("Visualizzazione del sottografo H (solo vincoli Size)")
         if bg_image_file is not None:
             bg_image = Image.open(bg_image_file)
@@ -232,7 +230,6 @@ def main():
                     x1, y1 = H.nodes[n1]["x"], H.nodes[n1]["y"]
                     x2, y2 = H.nodes[n2]["x"], H.nodes[n2]["y"]
                     ax2.plot([x1, x2], [y1, y2], color='blue', linewidth=2, alpha=0.7)
-                # Plot nodes
                 machine_nodes = [n for n in H.nodes() if H.nodes[n]["tag"] == "Macchina"]
                 corridor_nodes = [n for n in H.nodes() if H.nodes[n]["tag"] == "Corridoio"]
                 if machine_nodes:
@@ -253,6 +250,5 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 
