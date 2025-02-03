@@ -4,9 +4,11 @@ import matplotlib.pyplot as plt
 import networkx as nx
 from PIL import Image
 import math
+import itertools
+import io
 
 def main():
-    st.title("Caricamento dati da Excel + Costruzione Grafo Corridoio-Macchina con etichette")
+    st.title("Grafo Corridoio-Macchina: combinazioni macchine e percorsi più brevi")
 
     # 1. Caricamento file Excel
     excel_file = st.file_uploader(
@@ -64,12 +66,10 @@ def main():
             return
 
         # ---- COSTRUZIONE GRAFO ----
-
-        # 1) Crea un grafo iniziale vuoto
         G = nx.Graph()
 
-        # 2) Aggiunge i nodi (tutti i punti: corridoi e macchine)
-        #    Usando l'indice del DataFrame come 'id' del nodo
+        # Aggiunge tutti i nodi al grafo (sia corridoio che macchina)
+        # Usando l'indice del DataFrame come 'id' del nodo
         for idx, row in df.iterrows():
             x_val = row["X"]
             y_val = row["Y"]
@@ -77,17 +77,15 @@ def main():
             name_val = row["Entity Name"]
             G.add_node(idx, x=x_val, y=y_val, tag=tag_val, name=name_val)
 
-        # Funzione per calcolare la distanza euclidea tra due nodi nel grafo
         def distance(n1, n2):
+            """Distanza euclidea fra due nodi nel grafo."""
             x1, y1 = G.nodes[n1]["x"], G.nodes[n1]["y"]
             x2, y2 = G.nodes[n2]["x"], G.nodes[n2]["y"]
             return math.dist((x1, y1), (x2, y2))
 
-        # 3) Connettiamo i punti corridoio tra loro (MST sui Corridoi)
+        # --- Colleghiamo i Corridoi con un MST ---
         G_corr = nx.Graph()
         corridoio_indices = df_corridoio.index.tolist()
-
-        # Aggiunge i nodi (solo corridoio) al G_corr
         for idx_c in corridoio_indices:
             G_corr.add_node(idx_c)
 
@@ -107,11 +105,11 @@ def main():
             w = G_corr[n1][n2]["weight"]
             G.add_edge(n1, n2, weight=w)
 
-        # 4) Connettiamo ogni macchina al corridoio più vicino
+        # --- Colleghiamo ogni Macchina al Corridoio più vicino ---
         for idx_m, row_m in df_macchina.iterrows():
             nearest_corr = None
             nearest_dist = float("inf")
-            for idx_c, row_c in df_corridoio.iterrows():
+            for idx_c in corridoio_indices:
                 dist_mc = distance(idx_m, idx_c)
                 if dist_mc < nearest_dist:
                     nearest_dist = dist_mc
@@ -124,15 +122,11 @@ def main():
         st.write(f"Nodi totali: {G.number_of_nodes()}")
         st.write(f"Archi totali: {G.number_of_edges()}")
 
-        # ---- VISUALIZZAZIONE ----
-
-        # Apri l'immagine di sfondo
+        # ---- VISUALIZZAZIONE BASE ----
+        # (Facoltativa, come da esempio precedente: disegno sfondo e punti)
         bg_image = Image.open(bg_image_file)
-
-        # Crea il grafico
         fig, ax = plt.subplots(figsize=(10, 8))
 
-        # Limiti grafico (in base a min/max di tutti i punti)
         x_min, x_max = df["X"].min(), df["X"].max()
         y_min, y_max = df["Y"].min(), df["Y"].max()
 
@@ -147,48 +141,94 @@ def main():
             origin='upper'
         )
 
-        # Disegniamo gli archi del grafo
-        # e posizioniamo la distanza sugli archi se entrambi i nodi sono Corridoio
+        # Disegniamo gli archi (in blu)
         for (n1, n2) in G.edges():
             x1, y1 = G.nodes[n1]["x"], G.nodes[n1]["y"]
             x2, y2 = G.nodes[n2]["x"], G.nodes[n2]["y"]
             ax.plot([x1, x2], [y1, y2], color='blue', linewidth=1, alpha=0.5)
 
-            # Se entrambi sono corridoi, scriviamo la distanza a metà
-            if G.nodes[n1]["tag"] == "Corridoio" and G.nodes[n2]["tag"] == "Corridoio":
-                dist_val = G[n1][n2]["weight"]  # peso dell'arco
-                xm, ym = (x1 + x2) / 2, (y1 + y2) / 2
-                ax.text(xm, ym, f"{dist_val:.2f}", color='blue', fontsize=8,
-                        ha='center', va='center', bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.7))
-
-        # Disegna i punti Corridoio (in verde)
+        # Disegna i punti Corridoio (verde)
         ax.scatter(df_corridoio["X"], df_corridoio["Y"], c='green', marker='o', label='Corridoio')
-
-        # Disegna i punti Macchina (in rosso)
+        # Disegna i punti Macchina (rosso)
         ax.scatter(df_macchina["X"], df_macchina["Y"], c='red', marker='s', label='Macchina')
-
-        # Aggiunge il nome sui punti Macchina (colonna 'Entity Name')
-        for idx_m, row_m in df_macchina.iterrows():
-            x_m = row_m["X"]
-            y_m = row_m["Y"]
-            name_m = row_m["Entity Name"]
-            if pd.notna(x_m) and pd.notna(y_m):
-                ax.text(x_m, y_m, str(name_m), color='black', fontsize=8,
-                        ha='left', va='bottom',
-                        bbox=dict(boxstyle="round,pad=0.1", fc="yellow", ec="black", alpha=0.5))
 
         ax.set_xlabel("Coordinata X")
         ax.set_ylabel("Coordinata Y")
-        ax.set_title("Grafo Corridoio-Macchina con nomi Macchine e distanze Corridoi")
+        ax.set_title("Grafo Corridoio-Macchina (Visualizzazione Base)")
         ax.legend()
 
         st.pyplot(fig)
+
+        # =============== NUOVA PARTE: TUTTE LE COMBINAZIONI MACCHINE ===============
+        st.subheader("Calcolo di tutte le permutazioni (ordini) delle macchine")
+
+        # Indici (o ID) delle macchine nel DataFrame
+        machine_indices = df_macchina.index.tolist()
+
+        if len(machine_indices) == 0:
+            st.warning("Non ci sono macchine; impossibile creare percorsi.")
+            return
+
+        # Generiamo tutte le permutazioni (ordini) delle macchine
+        perms = itertools.permutations(machine_indices, len(machine_indices))
+
+        results = []
+        for perm in perms:
+            # perm è una tupla di indici (es. (2, 5, 10) ) corrispondenti a Macchine
+            route_names = []
+            route_distances = []  # distanza tra macchine consecutive
+            total_dist = 0.0
+
+            # Calcoliamo i "leg" (sotto-percorsi) tra una macchina e la successiva
+            for i in range(len(perm) - 1):
+                m1 = perm[i]
+                m2 = perm[i + 1]
+                # Calcola la distanza minima su G
+                dist_leg = nx.shortest_path_length(G, m1, m2, weight='weight')
+                route_distances.append(dist_leg)
+                total_dist += dist_leg
+
+            # Creiamo una stringa "MacchinaA -> MacchinaB -> ..."
+            # usando il nome 'Entity Name' dal DataFrame
+            route_names = [df.loc[idx_m, "Entity Name"] for idx_m in perm]
+            route_str = " -> ".join(str(name) for name in route_names)
+
+            # Creiamo la stringa delle distanze "d1 + d2 + ... = TOT"
+            sum_str = " + ".join(f"{dist:.2f}" for dist in route_distances)
+            sum_str += f" = {total_dist:.2f}"
+
+            results.append({
+                "Percorso": route_str,
+                "Somma valori (stringa)": sum_str,
+                "Valore complessivo": total_dist
+            })
+
+        # Convertiamo i risultati in DataFrame
+        df_results = pd.DataFrame(results)
+
+        # Mostra a schermo i risultati (ATTENZIONE: può essere molto lungo!)
+        st.write("Tabella dei percorsi e distanze:")
+        st.dataframe(df_results)
+
+        # ============ BOTTONE PER SCARICARE IL RISULTATO IN EXCEL ============
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df_results.to_excel(writer, index=False, sheet_name="Percorsi_Macchine")
+        excel_data = output.getvalue()
+
+        st.download_button(
+            label="Scarica risultati in Excel",
+            data=excel_data,
+            file_name="percorsi_macchine.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
     else:
         st.write("Carica sia il file Excel che l'immagine di sfondo per continuare.")
 
 if __name__ == "__main__":
     main()
+
 
 
 
