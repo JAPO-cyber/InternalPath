@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 
 def main():
-    st.title("Grafo Corridoio-Macchina con colonna 'Size' (scelta del corridoio basata sulla direzione)")
+    st.title("Grafo Corridoio-Macchina con colonna 'Size' (catena di collegamento)")
 
     # 1. Caricamento file Excel
     excel_file = st.file_uploader(
@@ -91,63 +91,61 @@ def main():
             w = G_corr[c1][c2]["weight"]
             G.add_edge(c1, c2, weight=w)
 
-        # ====== 2) Collegamento Macchine a Corridoi ======
-        def choose_corridor(machine_idx, corridor_indices):
+        # ====== 2) Collegamento Macchine a Corridoi con logica a catena ======
+        def choose_corridor_chain(machine_idx, corridor_indices):
             """
-            Per una macchina data, sceglie il corridoio in base alla direzione indicata nel campo "Size".
+            Per una macchina data, sceglie in catena il collegamento ai nodi corridoio.
             
-            Il procedimento è il seguente:
-            1. Si individua il corridoio candidato più vicino (ignorando il campo Size).
-            2. In base a "Size":
-               - Se "Alto": si considerano solo i corridoi con Y maggiore di quella del candidato.
-               - Se "Basso": si considerano solo i corridoi con Y minore di quella del candidato.
-               - Se "Sinistro": si considerano solo i corridoi con X minore di quella del candidato.
-               - Se "Destro": si considerano solo i corridoi con X maggiore di quella del candidato.
-            3. Tra i corridoi validi (se esistono) si sceglie quello più vicino (in distanza euclidea) alla macchina.
-            4. Se nessun corridoio soddisfa la condizione, si usa il candidato iniziale.
-            
-            Se il campo "Size" non è specificato o è vuoto, si usa il candidato basato sulla distanza minima.
+            1. Candidate1: è il corridoio più vicino alla macchina (ignorando il campo Size).
+            2. Candidate2: se il campo Size è specificato (ad es. "Alto", "Basso", "Sinistro", "Destro"),
+               si filtrano i corridoi affinché candidate2 abbia la coordinata (Y o X) maggiore o minore di quella
+               di candidate1 (in base alla direzione) e si sceglie quello più vicino a candidate1.
+            Se non esiste un candidate2, viene restituita solo la catena con candidate1.
+            Se il campo Size è vuoto, viene restituita la catena formata da un solo nodo.
             """
-            # Primo candidato: corridoio più vicino (senza considerare Size)
-            candidate = min(corridor_indices, key=lambda c: distance(machine_idx, c))
-            
+            # Primo candidato: il corridoio più vicino alla macchina
+            candidate1 = min(corridor_indices, key=lambda c: distance(machine_idx, c))
             size_val = G.nodes[machine_idx]["size"]
-            # Se Size non è specificato o vuoto, ritorna il candidato
             if pd.isna(size_val) or size_val.strip() == "":
-                return candidate, distance(machine_idx, candidate)
+                return [candidate1]
             
-            # Imposta il filtro in base al candidato
-            cand_x = G.nodes[candidate]["x"]
-            cand_y = G.nodes[candidate]["y"]
-            
+            # Per il secondo candidato, si filtra in base a candidate1
+            cand_x = G.nodes[candidate1]["x"]
+            cand_y = G.nodes[candidate1]["y"]
             if size_val == "Alto":
-                # Considera solo corridoi con Y maggiore di quella del candidato
-                valid = [c for c in corridor_indices if G.nodes[c]["y"] > cand_y]
+                valid = [c for c in corridor_indices if G.nodes[c]["y"] > cand_y and c != candidate1]
             elif size_val == "Basso":
-                # Considera solo corridoi con Y minore di quella del candidato
-                valid = [c for c in corridor_indices if G.nodes[c]["y"] < cand_y]
+                valid = [c for c in corridor_indices if G.nodes[c]["y"] < cand_y and c != candidate1]
             elif size_val == "Sinistro":
-                # Considera solo corridoi con X minore di quella del candidato
-                valid = [c for c in corridor_indices if G.nodes[c]["x"] < cand_x]
+                valid = [c for c in corridor_indices if G.nodes[c]["x"] < cand_x and c != candidate1]
             elif size_val == "Destro":
-                # Considera solo corridoi con X maggiore di quella del candidato
-                valid = [c for c in corridor_indices if G.nodes[c]["x"] > cand_x]
+                valid = [c for c in corridor_indices if G.nodes[c]["x"] > cand_x and c != candidate1]
             else:
-                valid = corridor_indices
+                valid = []
             
-            # Se esistono corridoi che soddisfano la condizione, ne sceglie il più vicino
             if valid:
-                best_corr = min(valid, key=lambda c: distance(machine_idx, c))
+                candidate2 = min(valid, key=lambda c: math.dist(
+                    (G.nodes[candidate1]["x"], G.nodes[candidate1]["y"]),
+                    (G.nodes[c]["x"], G.nodes[c]["y"])
+                ))
+                return [candidate1, candidate2]
             else:
-                best_corr = candidate
-            
-            return best_corr, distance(machine_idx, best_corr)
+                return [candidate1]
 
-        # Per ogni macchina, collega al corridoio scelto utilizzando la funzione choose_corridor
+        # Per ogni macchina, si applica la logica a catena
         for idx_m in df_macchina.index:
-            best_corr, best_dist = choose_corridor(idx_m, corr_indices)
-            if best_corr is not None:
-                G.add_edge(idx_m, best_corr, weight=best_dist)
+            chain = choose_corridor_chain(idx_m, corr_indices)
+            if chain:
+                # Collega la macchina al primo nodo della catena
+                w1 = distance(idx_m, chain[0])
+                G.add_edge(idx_m, chain[0], weight=w1)
+                # Se esiste il secondo nodo, collega candidate1 a candidate2
+                if len(chain) > 1:
+                    w2 = math.dist(
+                        (G.nodes[chain[0]]["x"], G.nodes[chain[0]]["y"]),
+                        (G.nodes[chain[1]]["x"], G.nodes[chain[1]]["y"])
+                    )
+                    G.add_edge(chain[0], chain[1], weight=w2)
 
         st.write(f"**Nodi nel grafo**: {G.number_of_nodes()}")
         st.write(f"**Archi nel grafo**: {G.number_of_edges()}")
