@@ -8,7 +8,7 @@ from PIL import Image
 import matplotlib.pyplot as plt
 
 def main():
-    st.title("Distanze tra coppie di macchine con nodi corridoio e dettaglio dei segmenti")
+    st.title("Distanze tra coppie di macchine: percorso completo con start, corridoi e end")
 
     # 1. Caricamento file Excel
     excel_file = st.file_uploader(
@@ -131,7 +131,7 @@ def main():
                 st.pyplot(fig)
 
         # =============== CALCOLO DISTANZE COPPIE (SENZA ORDINE) ===============
-        st.subheader("Distanze tra coppie di macchine con dettaglio corridoi e segmenti")
+        st.subheader("Distanze tra coppie di macchine (con percorso completo nel dettaglio)")
 
         machine_indices = df_macchina.index.tolist()
         if len(machine_indices) < 2:
@@ -145,8 +145,9 @@ def main():
             name1 = G.nodes[m1]["name"]
             name2 = G.nodes[m2]["name"]
 
-            # Troviamo il path effettivo (lista di nodi) e ne ricaviamo i pesi
+            # Troviamo il path effettivo (lista di nodi)
             path_nodes = nx.shortest_path(G, m1, m2, weight='weight')
+
             # Calcola le distanze "segmento per segmento"
             segment_distances = []
             for i in range(len(path_nodes) - 1):
@@ -158,16 +159,10 @@ def main():
             # Somma totale
             total_dist = sum(segment_distances)
 
-            # Estraggo i nodi Corridoio attraversati (escludendo le macchine)
-            # Oppure, se preferisci includere anche macchine, basta non filtrare
-            corridor_list = []
-            for nd in path_nodes:
-                if G.nodes[nd]["tag"] == "Corridoio":
-                    corridor_list.append(G.nodes[nd]["name"])  # usiamo il 'name'
-
-            # Creiamo la stringa dei corridoi attraversati
-            # Esempio: "Corr1 -> Corr2 -> Corr3"
-            corridor_str = " -> ".join(corridor_list) if corridor_list else ""
+            # Costruiamo una stringa con TUTTI i nodi (macchina iniziale, eventuali corridoi, macchina finale)
+            path_list = [G.nodes[nd]["name"] for nd in path_nodes]
+            # Esempio: "MacchinaA -> Corr1 -> Corr2 -> MacchinaB"
+            path_str = " -> ".join(path_list)
 
             # Creiamo la stringa dei segmenti con '+' in mezzo
             # Esempio: "3.45 + 2.10 + 5.00 = 10.55"
@@ -176,14 +171,17 @@ def main():
 
             results.append({
                 "Coppia Macchine": f"{name1} - {name2}",
-                "Corridoi attraversati": corridor_str,
+                # Seconda colonna: percorso completo (inizio, corridoi, fine)
+                "Percorso (macchine + corridoi)": path_str,
+                # Terza colonna: somma delle distanze con stringa
                 "Somma distanze (stringa)": sum_str,
+                # Quarta colonna: valore numerico totale
                 "Valore complessivo": total_dist
             })
 
         # Convertiamo in DataFrame e mostriamo
         df_results = pd.DataFrame(results)
-        # Ordiniamo ad esempio per "Valore complessivo"
+        # Ordiniamo per "Valore complessivo"
         df_results = df_results.sort_values(by="Valore complessivo", ascending=True)
 
         st.write("Tabella dei risultati:")
@@ -206,4 +204,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
