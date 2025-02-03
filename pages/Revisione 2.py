@@ -241,7 +241,18 @@ def main():
                     ax2.scatter(x_machine, y_machine, color='red', marker='s', label='Macchina')
                 if corridor_nodes:
                     x_corr = [H.nodes[n]["x"] for n in corridor_nodes]
-                    y_corr = [H.nodes[n]["y"] for n in 
+                    y_corr = [H.nodes[n]["y"] for n in corridor_nodes]
+                    ax2.scatter(x_corr, y_corr, color='green', marker='o', label='Corridoio')
+                ax2.set_title("Sottografo H – Solo vincoli Size")
+                ax2.legend()
+                st.pyplot(fig2)
+        else:
+            st.write("Nessuna immagine di sfondo caricata.")
+    else:
+        st.write("Carica un file Excel per iniziare.")
+
+if __name__ == "__main__":
+    main()
 
 
 
