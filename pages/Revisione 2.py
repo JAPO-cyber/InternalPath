@@ -9,48 +9,48 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 
 def main():
-    st.title("Grafo Corridoio-Macchina con catena (filtrata ad ogni step in base a Size)")
+    st.title("Grafo Corridoio-Macchina – Catena con Filtraggio ad Ogni Step")
 
-    # 1. Caricamento file Excel
+    # 1. Carica file Excel
     excel_file = st.file_uploader(
         label="Carica un file Excel (X, Y, Tag, Entity Name, Size)",
         type=["xls", "xlsx"]
     )
-
-    # 2. (Opzionale) Caricamento immagine di sfondo
+    
+    # 2. (Opzionale) Carica immagine di sfondo
     bg_image_file = st.file_uploader(
         label="Carica un'immagine di sfondo (jpg, jpeg, png) [Opzionale]",
         type=["jpg", "jpeg", "png"]
     )
-
+    
     if excel_file is not None:
         # Legge il DataFrame
         df = pd.read_excel(excel_file)
         st.subheader("Anteprima del DataFrame caricato")
         st.dataframe(df.head())
-
-        # Verifica la presenza delle colonne necessarie
+        
+        # Verifica le colonne necessarie
         needed_cols = ["X", "Y", "Tag", "Entity Name", "Size"]
         for c in needed_cols:
             if c not in df.columns:
                 st.error(f"Colonna '{c}' mancante nel file Excel.")
                 return
-
-        # Converte X e Y in valori numerici
+        
+        # Converte X e Y in numerico
         df["X"] = pd.to_numeric(df["X"], errors="coerce")
         df["Y"] = pd.to_numeric(df["Y"], errors="coerce")
-
+        
         # Suddivide in nodi "Corridoio" e "Macchina"
         df_corridoio = df[df["Tag"] == "Corridoio"].copy()
         df_macchina = df[df["Tag"] == "Macchina"].copy()
-
         if df_corridoio.empty:
             st.warning("Non ci sono corridoi: impossibile costruire il grafo completo.")
             return
         if df_macchina.empty:
             st.warning("Non ci sono macchine: non ci sono coppie da calcolare.")
-
-        # Crea il grafo principale e aggiunge tutti i nodi con relativi attributi
+            # (Se necessario, puoi comunque visualizzare solo il grafo dei corridoi)
+        
+        # Crea il grafo principale e aggiunge tutti i nodi
         G = nx.Graph()
         for idx, row in df.iterrows():
             G.add_node(
@@ -61,13 +61,13 @@ def main():
                 name=row["Entity Name"],
                 size=row.get("Size", None)
             )
-
+        
         # Funzione per calcolare la distanza euclidea
         def distance(n1, n2):
             x1, y1 = G.nodes[n1]["x"], G.nodes[n1]["y"]
             x2, y2 = G.nodes[n2]["x"], G.nodes[n2]["y"]
             return math.dist((x1, y1), (x2, y2))
-
+        
         # ====== 1) Collegamento Corridoi (MST) ======
         corr_indices = df_corridoio.index.tolist()
         G_corr = nx.Graph()
@@ -81,77 +81,106 @@ def main():
         mst_corridoi = nx.minimum_spanning_tree(G_corr, weight='weight')
         for (c1, c2) in mst_corridoi.edges():
             G.add_edge(c1, c2, weight=G_corr[c1][c2]["weight"])
-
-        # ====== 2) Collegamento Macchine a Corridoi con catena (filtrata ad ogni step) ======
+        
+        # ====== 2) Collegamento Macchine a Corridoi con Catena "Hard‐Filtered" ======
         def choose_corridor_chain(machine_idx, corridor_indices):
             """
-            For a given machine, build the chain of corridor nodes as follows:
-              1. Based on the machine's Size value, filter corridor nodes with respect to the machine’s coordinates.
-                 For example, if Size is "destro" then only keep corridors with x > machine.x.
-              2. Sort the filtered corridors according to the relevant coordinate:
-                 - "destro": increasing x
-                 - "sinistro": decreasing x
-                 - "alto": increasing y
-                 - "basso": decreasing y
-              3. Return the sorted list as the chain.
-            If Size is empty, return the single nearest corridor (without filtering).
+            Per la macchina indicata, costruisce una catena di nodi corridoio
+            in base alla direzione indicata nel campo "Size" della macchina.
+            
+            • Per il primo candidato, si filtrano **solamente** i nodi corridoio (non la macchina)
+                che soddisfano la condizione rispetto alle coordinate della macchina.
+                Ad esempio, se Size è "destro", vengono considerati solo i nodi corridoio con x > machine.x.
+            
+            • Una volta scelto il primo candidato, la catena viene estesa in modo iterativo:
+                il prossimo candidato è scelto filtrando i nodi corridoio in base al nodo corridoio precedente.
+                Ad esempio, se il primo candidato ha x = 3.46, per Size "destro" vengono considerati
+                solo i nodi corridoio con x > 3.46.
+            
+            Ritorna la lista (catena) dei nodi corridoio selezionati.
+            Se nessun nodo soddisfa il filtro per il primo candidato, ritorna una lista vuota.
             """
             size_val = G.nodes[machine_idx]["size"]
-            # Normalize the size value (trim spaces and lower-case)
             direction = size_val.strip().lower() if isinstance(size_val, str) else ""
-            if direction == "":
-                # No directional condition: simply return the nearest corridor as a single-element chain.
-                candidate = min(corridor_indices, key=lambda c: distance(machine_idx, c))
-                return [candidate]
-            # Get the machine's coordinates.
             machine_x = G.nodes[machine_idx]["x"]
             machine_y = G.nodes[machine_idx]["y"]
-            # Filter corridors according to the directional condition relative to the machine.
+            chain = []
+            
+            # Per il primo candidato, filtriamo utilizzando la macchina (e non includiamo la macchina stessa)
             if direction == "destro":
-                valid = [c for c in corridor_indices if G.nodes[c]["x"] > machine_x]
-                # Sort in increasing order of x.
-                sorted_valid = sorted(valid, key=lambda c: G.nodes[c]["x"])
+                valid_first = [c for c in corridor_indices if G.nodes[c]["x"] > machine_x]
+                sorted_first = sorted(valid_first, key=lambda c: G.nodes[c]["x"])
             elif direction == "sinistro":
-                valid = [c for c in corridor_indices if G.nodes[c]["x"] < machine_x]
-                # Sort in decreasing order of x.
-                sorted_valid = sorted(valid, key=lambda c: G.nodes[c]["x"], reverse=True)
+                valid_first = [c for c in corridor_indices if G.nodes[c]["x"] < machine_x]
+                sorted_first = sorted(valid_first, key=lambda c: G.nodes[c]["x"], reverse=True)
             elif direction == "alto":
-                valid = [c for c in corridor_indices if G.nodes[c]["y"] > machine_y]
-                # Sort in increasing order of y.
-                sorted_valid = sorted(valid, key=lambda c: G.nodes[c]["y"])
+                valid_first = [c for c in corridor_indices if G.nodes[c]["y"] > machine_y]
+                sorted_first = sorted(valid_first, key=lambda c: G.nodes[c]["y"])
             elif direction == "basso":
-                valid = [c for c in corridor_indices if G.nodes[c]["y"] < machine_y]
-                # Sort in decreasing order of y.
-                sorted_valid = sorted(valid, key=lambda c: G.nodes[c]["y"], reverse=True)
+                valid_first = [c for c in corridor_indices if G.nodes[c]["y"] < machine_y]
+                sorted_first = sorted(valid_first, key=lambda c: G.nodes[c]["y"], reverse=True)
             else:
-                sorted_valid = []
-            return sorted_valid
-
-        # For each machine, get the chain and add edges:
+                # Se il campo Size è vuoto, restituisci il singolo candidato (più vicino)
+                candidate = min(corridor_indices, key=lambda c: distance(machine_idx, c))
+                return [candidate]
+            
+            if not sorted_first:
+                return []  # nessun nodo corridoio soddisfa il filtro rispetto alla macchina
+            
+            # Prendi il primo candidato dalla lista ordinata
+            chain.append(sorted_first[0])
+            
+            # Ora, per ogni step successivo, filtra i nodi corridoio in base al nodo corridoio precedente.
+            last = chain[0]
+            while True:
+                if direction == "destro":
+                    valid_next = [c for c in corridor_indices if G.nodes[c]["x"] > G.nodes[last]["x"]]
+                    valid_next = sorted(valid_next, key=lambda c: G.nodes[c]["x"])
+                elif direction == "sinistro":
+                    valid_next = [c for c in corridor_indices if G.nodes[c]["x"] < G.nodes[last]["x"]]
+                    valid_next = sorted(valid_next, key=lambda c: G.nodes[c]["x"], reverse=True)
+                elif direction == "alto":
+                    valid_next = [c for c in corridor_indices if G.nodes[c]["y"] > G.nodes[last]["y"]]
+                    valid_next = sorted(valid_next, key=lambda c: G.nodes[c]["y"])
+                elif direction == "basso":
+                    valid_next = [c for c in corridor_indices if G.nodes[c]["y"] < G.nodes[last]["y"]]
+                    valid_next = sorted(valid_next, key=lambda c: G.nodes[c]["y"], reverse=True)
+                else:
+                    valid_next = []
+                
+                # Escludi i nodi già nella catena
+                valid_next = [c for c in valid_next if c not in chain]
+                if not valid_next:
+                    break
+                # Prendi il primo candidato della lista ordinata
+                chain.append(valid_next[0])
+                last = valid_next[0]
+            return chain
+        
+        # Per ogni macchina, ottieni la catena filtrata e crea gli archi corrispondenti
         for idx_m in df_macchina.index:
             chain = choose_corridor_chain(idx_m, corr_indices)
             if chain:
-                # Connect the machine to the first candidate in the chain.
+                # Collega la macchina al primo nodo corridoio della catena
                 w1 = distance(idx_m, chain[0])
                 G.add_edge(idx_m, chain[0], weight=w1)
-                # Connect each candidate in the chain sequentially.
+                # Collega in sequenza i nodi corridoio della catena
                 for i in range(len(chain) - 1):
-                    w = math.dist((G.nodes[chain[i]]["x"], G.nodes[chain[i]]["y"]),
-                                  (G.nodes[chain[i+1]]["x"], G.nodes[chain[i+1]]["y"]))
+                    w = distance(chain[i], chain[i+1])
                     G.add_edge(chain[i], chain[i+1], weight=w)
             else:
                 st.write(f"Nessun nodo corridoio soddisfa il filtro per la macchina '{G.nodes[idx_m]['name']}' con Size '{G.nodes[idx_m]['size']}'.")
 
         st.write(f"**Nodi nel grafo**: {G.number_of_nodes()}")
         st.write(f"**Archi nel grafo**: {G.number_of_edges()}")
-
+        
         # ====== 3) Calcolo delle distanze tra coppie di macchine ======
         st.subheader("Distanze tra coppie di macchine (con percorso completo)")
         machine_indices = df_macchina.index.tolist()
         if len(machine_indices) < 2:
             st.info("Meno di due macchine, nessuna coppia da calcolare.")
             return
-
+        
         G_paths = nx.Graph()
         G_paths.add_nodes_from(G.nodes(data=True))
         edge_usage_count = defaultdict(int)
@@ -195,7 +224,7 @@ def main():
             file_name="distanze_coppie_macchine.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-
+        
         # ====== 4) Visualizzazione del sottografo G_paths ======
         st.subheader("Visualizzazione dei percorsi effettivamente usati (con count su ciascun arco)")
         if bg_image_file is not None:
@@ -275,4 +304,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
