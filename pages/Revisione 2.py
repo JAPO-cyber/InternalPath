@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 
 def main():
-    st.title("Grafo Corridoio-Macchina con colonna 'Size' e conteggio utilizzo archi")
+    st.title("Grafo Corridoio-Macchina con colonna 'Size' (confronto su X,Y del corridoio)")
 
     # 1. Caricamento file Excel
     excel_file = st.file_uploader(
@@ -63,7 +63,7 @@ def main():
                 y=row["Y"],
                 tag=row["Tag"],
                 name=row["Entity Name"],
-                size=row.get("Size", None)  # può essere 'vuoto', 'Sinistro', 'Destro', 'Alto', 'Basso'
+                size=row.get("Size", None)  # valore come "Sinistro", "Destro", "Alto", "Basso", o vuoto
             )
 
         # Funzione di distanza euclidea
@@ -89,43 +89,59 @@ def main():
             w = G_corr[c1][c2]["weight"]
             G.add_edge(c1, c2, weight=w)
 
-        # ====== 2) Collegamento Macchine in base a 'Size' ======
-        def filtra_corridoi_per_size(macchina_idx, corridoi_indices):
+        # ====== 2) Collegamento Macchine in base a 'Size', ma confrontando X,Y del corridoio ======
+
+        def filtra_corridoi_per_size(machine_idx, corridor_indices):
             """
-            Ritorna l'elenco di corridoi 'filtrati' in base al valore di 'Size' della macchina.
-            
-            Se 'Size' è vuoto/NaN, NON si filtra nulla (considera tutti i corridoi).
-            Altrimenti:
-             - 'Sinistro':   prendi solo corridoi con X < X_macchina
-             - 'Destro':     prendi solo corridoi con X > X_macchina
-             - 'Alto':       prendi solo corridoi con Y > Y_macchina
-             - 'Basso':      prendi solo corridoi con Y < Y_macchina
-            Se il filtro è vuoto (nessun corridoio), la funzione restituirà una lista vuota.
+            Ritorna i corridoi 'validi' in base al valore di 'Size' della macchina.
+            In particolare, se Size = 'Sinistro', cerchiamo i corridoi con cx < mx, ecc.
+            Se la colonna 'Size' è vuota/NaN, non applichiamo filtro (tutti validi).
             """
-            size_val = G.nodes[macchina_idx]["size"]
-            xm, ym = G.nodes[macchina_idx]["x"], G.nodes[macchina_idx]["y"]
+
+            size_val = G.nodes[machine_idx]["size"]
+            # Coordinate della macchina
+            mx, my = G.nodes[machine_idx]["x"], G.nodes[machine_idx]["y"]
 
             # Se 'Size' è vuoto/NaN/blank => nessun filtro
             if pd.isna(size_val) or size_val.strip() == "":
-                return corridoi_indices
+                return corridor_indices
 
-            if size_val == "Sinistro":
-                return [c for c in corridoi_indices if G.nodes[c]["x"] < xm]
-            elif size_val == "Destro":
-                return [c for c in corridoi_indices if G.nodes[c]["x"] > xm]
-            elif size_val == "Alto":
-                return [c for c in corridoi_indices if G.nodes[c]["y"] > ym]
-            elif size_val == "Basso":
-                return [c for c in corridoi_indices if G.nodes[c]["y"] < ym]
-            else:
-                # Se ci sono valori non standard, non filtri
-                return corridoi_indices
+            filtered = []
+            for c_idx in corridor_indices:
+                cx, cy = G.nodes[c_idx]["x"], G.nodes[c_idx]["y"]
 
-        # Per ogni macchina, colleghiamo al corridoio "scelto" in base a Size
+                if size_val == "Sinistro":
+                    # corridor X < machine X
+                    if cx < mx:
+                        filtered.append(c_idx)
+
+                elif size_val == "Destro":
+                    # corridor X > machine X
+                    if cx > mx:
+                        filtered.append(c_idx)
+
+                elif size_val == "Alto":
+                    # corridor Y > machine Y
+                    if cy > my:
+                        filtered.append(c_idx)
+
+                elif size_val == "Basso":
+                    # corridor Y < machine Y
+                    if cy < my:
+                        filtered.append(c_idx)
+
+                else:
+                    # se Size ha un valore non previsto, non filtriamo
+                    return corridor_indices
+
+            return filtered
+
+        # Per ogni macchina, colleghiamo al corridoio "scelto" in base alle regole
         for idx_m in df_macchina.index:
             candidati = filtra_corridoi_per_size(idx_m, corr_indices)
 
-            # Se il filtro è vuoto, fallback: consideriamo TUTTI i corridoi
+            # Se il filtro è vuoto (nessun corridoio soddisfa la condizione),
+            # fallback: consideriamo TUTTI i corridoi
             if not candidati:
                 candidati = corr_indices
 
@@ -155,11 +171,8 @@ def main():
             return
 
         # Creiamo un sottografo G_paths che conterrà solo gli archi usati
-        # e un contatore di quante volte ciascun arco è stato usato
         G_paths = nx.Graph()
-        G_paths.add_nodes_from(G.nodes(data=True))  # Copia tutti i nodi con attributi
-
-        from collections import defaultdict
+        G_paths.add_nodes_from(G.nodes(data=True))  # Copia i nodi con attributi
         edge_usage_count = defaultdict(int)
 
         results = []
@@ -333,5 +346,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
