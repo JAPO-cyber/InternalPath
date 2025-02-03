@@ -8,7 +8,7 @@ from PIL import Image
 import matplotlib.pyplot as plt
 
 def main():
-    st.title("Distanze tra coppie di macchine: percorso completo con start, corridoi e end")
+    st.title("Distanze tra coppie di macchine con percorso completo (start, corridoi, end)")
 
     # 1. Caricamento file Excel
     excel_file = st.file_uploader(
@@ -37,7 +37,7 @@ def main():
                 st.error(f"Colonna '{c}' mancante nel file Excel.")
                 return
 
-        # Pulizia rapida: se trovi ' m' in X/Y, rimuovi e converti
+        # Pulizia rapida: se trovi ' m' in X/Y, rimuovi e converti in numerico
         df["X"] = df["X"].apply(lambda v: None if isinstance(v, str) and ' m' in v else v)
         df["Y"] = df["Y"].apply(lambda v: None if isinstance(v, str) and ' m' in v else v)
         df["X"] = pd.to_numeric(df["X"], errors="coerce")
@@ -131,7 +131,7 @@ def main():
                 st.pyplot(fig)
 
         # =============== CALCOLO DISTANZE COPPIE (SENZA ORDINE) ===============
-        st.subheader("Distanze tra coppie di macchine (con percorso completo nel dettaglio)")
+        st.subheader("Distanze tra coppie di macchine (con percorso completo)")
 
         machine_indices = df_macchina.index.tolist()
         if len(machine_indices) < 2:
@@ -159,23 +159,20 @@ def main():
             # Somma totale
             total_dist = sum(segment_distances)
 
-            # Costruiamo una stringa con TUTTI i nodi (macchina iniziale, eventuali corridoi, macchina finale)
+            # Costruisci la stringa con TUTTO il percorso (macchina iniziale, eventuali corridoi, macchina finale)
             path_list = [G.nodes[nd]["name"] for nd in path_nodes]
-            # Esempio: "MacchinaA -> Corr1 -> Corr2 -> MacchinaB"
+            # Es: "MacchinaA -> Corr1 -> Corr2 -> MacchinaB"
             path_str = " -> ".join(path_list)
 
-            # Creiamo la stringa dei segmenti con '+' in mezzo
-            # Esempio: "3.45 + 2.10 + 5.00 = 10.55"
+            # Crea la stringa delle distanze
+            # Es: "3.45 + 2.10 + 5.00 = 10.55"
             sum_str = " + ".join(f"{dist_val:.2f}" for dist_val in segment_distances)
             sum_str += f" = {total_dist:.2f}"
 
             results.append({
                 "Coppia Macchine": f"{name1} - {name2}",
-                # Seconda colonna: percorso completo (inizio, corridoi, fine)
                 "Percorso (macchine + corridoi)": path_str,
-                # Terza colonna: somma delle distanze con stringa
                 "Somma distanze (stringa)": sum_str,
-                # Quarta colonna: valore numerico totale
                 "Valore complessivo": total_dist
             })
 
@@ -199,10 +196,12 @@ def main():
             file_name="distanze_coppie_macchine.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+
     else:
         st.write("Carica un file Excel per iniziare.")
 
 if __name__ == "__main__":
     main()
+
 
 
