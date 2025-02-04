@@ -62,13 +62,13 @@ def main():
             base_weight = math.dist((x1, y1), (x2, y2))
             
             if x2 > x1 and pref == "destro":
-                return base_weight * 0.1
+                return base_weight * 0.4
             elif x2 < x1 and pref == "sinistro":
-                return base_weight * 0.1
+                return base_weight * 0.4
             elif y2 > y1 and pref == "alto":
-                return base_weight * 0.1
+                return base_weight * 0.4
             elif y2 < y1 and pref == "basso":
-                return base_weight * 0.1
+                return base_weight * 0.4
             else:
                 return base_weight * 1
         
