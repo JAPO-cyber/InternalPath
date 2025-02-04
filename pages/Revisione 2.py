@@ -52,23 +52,27 @@ def main():
                 y=row["Y"],
                 tag=row["Tag"],
                 name=row["Entity Name"],
-                size=row.get("Size", None)
+                size=row.get("Size", "")
             )
         
-        # Function for weighted distance with directional preferences
+        # Function for weighted distance with directional constraints
         def weighted_distance(n1, n2):
             x1, y1, pref = G.nodes[n1]["x"], G.nodes[n1]["y"], G.nodes[n1].get("size", "")
             x2, y2 = G.nodes[n2]["x"], G.nodes[n2]["y"]
             base_weight = math.dist((x1, y1), (x2, y2))
             
-            if G.nodes[n1]["tag"] == "Corridoio" and G.nodes[n2]["tag"] == "Corridoio":
-                return base_weight * 0.5  # Favorisce i collegamenti tra corridoi
-            elif G.nodes[n1]["tag"] == "Macchina" or G.nodes[n2]["tag"] == "Macchina":
-                return base_weight * 2  # Penalizza il collegamento diretto tra macchine
+            if pref == "destro" and x2 < x1:
+                return base_weight * 100  # Penalizzazione più severa
+            elif pref == "sinistro" and x2 > x1:
+                return base_weight * 100
+            elif pref == "alto" and y2 < y1:
+                return base_weight * 100
+            elif pref == "basso" and y2 > y1:
+                return base_weight * 100
             else:
-                return base_weight * 1.1  # Penalizzazione meno severa
+                return base_weight * 1.0  # Mantiene il peso standard se segue la direzione
         
-        # --- Build the MST for corridors ---
+        # --- Build the MST for corridors respecting Size constraints ---
         corr_indices = df_corridoio.index.tolist()
         G_corr = nx.Graph()
         G_corr.add_nodes_from(corr_indices)
@@ -81,13 +85,30 @@ def main():
         for (c1, c2) in mst_corridoi.edges():
             G.add_edge(c1, c2, weight=G_corr[c1][c2]["weight"])
         
-        # Connect machines to the closest corridor node
+        # Connect machines to the closest corridor node considering direction constraints
         for m_idx in df_macchina.index:
-            closest_corridor = min(df_corridoio.index, key=lambda c: weighted_distance(m_idx, c))
-            G.add_edge(m_idx, closest_corridor, weight=weighted_distance(m_idx, closest_corridor))
+            size_val = G.nodes[m_idx]["size"]
+            if size_val == "destro":
+                valid_corridors = [c for c in df_corridoio.index if G.nodes[c]["x"] > G.nodes[m_idx]["x"]]
+            elif size_val == "sinistro":
+                valid_corridors = [c for c in df_corridoio.index if G.nodes[c]["x"] < G.nodes[m_idx]["x"]]
+            elif size_val == "alto":
+                valid_corridors = [c for c in df_corridoio.index if G.nodes[c]["y"] > G.nodes[m_idx]["y"]]
+            elif size_val == "basso":
+                valid_corridors = [c for c in df_corridoio.index if G.nodes[c]["y"] < G.nodes[m_idx]["y"]]
+            else:
+                valid_corridors = df_corridoio.index.tolist()
+            
+            if valid_corridors:
+                closest_corridor = min(valid_corridors, key=lambda c: weighted_distance(m_idx, c))
+                G.add_edge(m_idx, closest_corridor, weight=weighted_distance(m_idx, closest_corridor))
+            else:
+                # Fallback: connetti al corridoio più vicino senza considerare la direzione
+                fallback_corridor = min(df_corridoio.index, key=lambda c: math.dist((G.nodes[m_idx]["x"], G.nodes[m_idx]["y"]), (G.nodes[c]["x"], G.nodes[c]["y"])))
+                G.add_edge(m_idx, fallback_corridor, weight=math.dist((G.nodes[m_idx]["x"], G.nodes[m_idx]["y"]), (G.nodes[fallback_corridor]["x"], G.nodes[fallback_corridor]["y"])))
         
         # Compute shortest paths between machine nodes
-        st.subheader("Percorsi reali tra macchine con pesi")
+        st.subheader("Percorsi ottimizzati tra macchine con direzioni vincolate")
         machine_indices = df_macchina.index.tolist()
         if len(machine_indices) >= 2:
             for m1, m2 in itertools.combinations(machine_indices, 2):
@@ -96,39 +117,18 @@ def main():
                     path_edges = list(zip(path_nodes[:-1], path_nodes[1:]))
                     
                     fig, ax = plt.subplots(figsize=(10, 8))
-                    
-                    # Plot all edges in light color
-                    for (n1, n2) in G.edges():
-                        x1, y1 = G.nodes[n1]["x"], G.nodes[n1]["y"]
-                        x2, y2 = G.nodes[n2]["x"], G.nodes[n2]["y"]
-                        ax.plot([x1, x2], [y1, y2], color='lightgray', linewidth=1, alpha=0.5)
-                    
-                    # Highlight the shortest path and display weights
                     for (n1, n2) in path_edges:
                         x1, y1 = G.nodes[n1]["x"], G.nodes[n1]["y"]
                         x2, y2 = G.nodes[n2]["x"], G.nodes[n2]["y"]
-                        weight = G[n1][n2]['weight']
                         ax.plot([x1, x2], [y1, y2], color='red', linewidth=2)
-                        ax.text((x1 + x2) / 2, (y1 + y2) / 2, f"{weight:.2f}", fontsize=9, color='black')
                     
-                    # Plot nodes
-                    x_mach = [G.nodes[n]["x"] for n in machine_indices]
-                    y_mach = [G.nodes[n]["y"] for n in machine_indices]
-                    ax.scatter(x_mach, y_mach, color='blue', marker='s', label='Macchine')
-                    
-                    x_corr = [G.nodes[n]["x"] for n in corr_indices]
-                    y_corr = [G.nodes[n]["y"] for n in corr_indices]
-                    ax.scatter(x_corr, y_corr, color='green', marker='o', label='Corridoi')
-                    
-                    ax.set_title(f"Percorso reale tra {G.nodes[m1]['name']} e {G.nodes[m2]['name']} (con pesi)")
-                    ax.legend()
-                    plt.grid(True)
                     st.pyplot(fig)
                 except nx.NetworkXNoPath:
                     st.write(f"Nessun percorso trovato tra {G.nodes[m1]['name']} e {G.nodes[m2]['name']}")
 
 if __name__ == "__main__":
     main()
+
 
 
 
