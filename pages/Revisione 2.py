@@ -62,15 +62,15 @@ def main():
             base_weight = math.dist((x1, y1), (x2, y2))
             
             if x2 > x1 and pref == "destro":
-                return base_weight * 0.5
+                return base_weight * 0.8  # Penalizzazione meno severa
             elif x2 < x1 and pref == "sinistro":
-                return base_weight * 0.5
+                return base_weight * 0.8
             elif y2 > y1 and pref == "alto":
-                return base_weight * 0.5
+                return base_weight * 0.8
             elif y2 < y1 and pref == "basso":
-                return base_weight * 0.5
+                return base_weight * 0.8
             else:
-                return base_weight * 1.5
+                return base_weight * 1.1  # Penalizzazione meno severa
         
         # --- Build the MST for corridors ---
         corr_indices = df_corridoio.index.tolist()
@@ -84,6 +84,15 @@ def main():
         mst_corridoi = nx.minimum_spanning_tree(G_corr, weight='weight')
         for (c1, c2) in mst_corridoi.edges():
             G.add_edge(c1, c2, weight=G_corr[c1][c2]["weight"])
+        
+        # Connect machines to the closest corridor node
+        for m_idx in df_macchina.index:
+            closest_corridor = min(df_corridoio.index, key=lambda c: weighted_distance(m_idx, c))
+            G.add_edge(m_idx, closest_corridor, weight=weighted_distance(m_idx, closest_corridor))
+        
+        # Check connectivity of the graph
+        if not nx.is_connected(G):
+            st.warning("Il grafo non è completamente connesso. Alcune macchine potrebbero non essere raggiungibili.")
         
         # Compute shortest paths between machine nodes
         st.subheader("Percorsi ottimizzati tra macchine")
@@ -126,7 +135,5 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
 
 
