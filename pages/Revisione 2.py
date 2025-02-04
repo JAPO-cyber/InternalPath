@@ -87,7 +87,7 @@ def main():
             G.add_edge(m_idx, closest_corridor, weight=weighted_distance(m_idx, closest_corridor))
         
         # Compute shortest paths between machine nodes
-        st.subheader("Percorsi ottimizzati tra macchine passando dai corridoi")
+        st.subheader("Percorsi reali tra macchine con pesi")
         machine_indices = df_macchina.index.tolist()
         if len(machine_indices) >= 2:
             for m1, m2 in itertools.combinations(machine_indices, 2):
@@ -103,11 +103,13 @@ def main():
                         x2, y2 = G.nodes[n2]["x"], G.nodes[n2]["y"]
                         ax.plot([x1, x2], [y1, y2], color='lightgray', linewidth=1, alpha=0.5)
                     
-                    # Highlight the shortest path
+                    # Highlight the shortest path and display weights
                     for (n1, n2) in path_edges:
                         x1, y1 = G.nodes[n1]["x"], G.nodes[n1]["y"]
                         x2, y2 = G.nodes[n2]["x"], G.nodes[n2]["y"]
+                        weight = G[n1][n2]['weight']
                         ax.plot([x1, x2], [y1, y2], color='red', linewidth=2)
+                        ax.text((x1 + x2) / 2, (y1 + y2) / 2, f"{weight:.2f}", fontsize=9, color='black')
                     
                     # Plot nodes
                     x_mach = [G.nodes[n]["x"] for n in machine_indices]
@@ -118,7 +120,7 @@ def main():
                     y_corr = [G.nodes[n]["y"] for n in corr_indices]
                     ax.scatter(x_corr, y_corr, color='green', marker='o', label='Corridoi')
                     
-                    ax.set_title(f"Percorso ottimale tra {G.nodes[m1]['name']} e {G.nodes[m2]['name']} (via corridoi)")
+                    ax.set_title(f"Percorso reale tra {G.nodes[m1]['name']} e {G.nodes[m2]['name']} (con pesi)")
                     ax.legend()
                     plt.grid(True)
                     st.pyplot(fig)
