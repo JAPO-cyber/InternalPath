@@ -61,14 +61,10 @@ def main():
             x2, y2 = G.nodes[n2]["x"], G.nodes[n2]["y"]
             base_weight = math.dist((x1, y1), (x2, y2))
             
-            if x2 > x1 and pref == "destro":
-                return base_weight * 0.8  # Penalizzazione meno severa
-            elif x2 < x1 and pref == "sinistro":
-                return base_weight * 0.8
-            elif y2 > y1 and pref == "alto":
-                return base_weight * 0.8
-            elif y2 < y1 and pref == "basso":
-                return base_weight * 0.8
+            if G.nodes[n1]["tag"] == "Corridoio" and G.nodes[n2]["tag"] == "Corridoio":
+                return base_weight * 0.5  # Favorisce i collegamenti tra corridoi
+            elif G.nodes[n1]["tag"] == "Macchina" or G.nodes[n2]["tag"] == "Macchina":
+                return base_weight * 2  # Penalizza il collegamento diretto tra macchine
             else:
                 return base_weight * 1.1  # Penalizzazione meno severa
         
@@ -90,12 +86,8 @@ def main():
             closest_corridor = min(df_corridoio.index, key=lambda c: weighted_distance(m_idx, c))
             G.add_edge(m_idx, closest_corridor, weight=weighted_distance(m_idx, closest_corridor))
         
-        # Check connectivity of the graph
-        if not nx.is_connected(G):
-            st.warning("Il grafo non è completamente connesso. Alcune macchine potrebbero non essere raggiungibili.")
-        
         # Compute shortest paths between machine nodes
-        st.subheader("Percorsi ottimizzati tra macchine")
+        st.subheader("Percorsi ottimizzati tra macchine passando dai corridoi")
         machine_indices = df_macchina.index.tolist()
         if len(machine_indices) >= 2:
             for m1, m2 in itertools.combinations(machine_indices, 2):
@@ -126,7 +118,7 @@ def main():
                     y_corr = [G.nodes[n]["y"] for n in corr_indices]
                     ax.scatter(x_corr, y_corr, color='green', marker='o', label='Corridoi')
                     
-                    ax.set_title(f"Percorso ottimale tra {G.nodes[m1]['name']} e {G.nodes[m2]['name']}")
+                    ax.set_title(f"Percorso ottimale tra {G.nodes[m1]['name']} e {G.nodes[m2]['name']} (via corridoi)")
                     ax.legend()
                     plt.grid(True)
                     st.pyplot(fig)
@@ -135,5 +127,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
