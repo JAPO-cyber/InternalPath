@@ -3,125 +3,159 @@ import pandas as pd
 import networkx as nx
 import math
 import itertools
-import io
-from PIL import Image
 import matplotlib.pyplot as plt
-from collections import defaultdict
 
 def main():
-    st.title("Grafo Corridoio-Macchina – Constrained Path using Size")
-
-    # 1. Upload Excel file
+    st.title("Grafo Corridoio-Macchina – Percorso Forzato Ristrutturato")
+    
+    # 1. Caricamento del file Excel
     excel_file = st.file_uploader(
-        label="Carica un file Excel (X, Y, Tag, Entity Name, Size)",
+        "Carica file Excel (X, Y, Tag, Entity Name, Size)",
         type=["xls", "xlsx"]
     )
+    if not excel_file:
+        return
     
-    if excel_file is not None:
-        # Read the DataFrame
-        df = pd.read_excel(excel_file)
-        st.subheader("Anteprima del DataFrame caricato")
-        st.dataframe(df.head())
-        
-        # Verify required columns
-        needed_cols = ["X", "Y", "Tag", "Entity Name", "Size"]
-        for c in needed_cols:
-            if c not in df.columns:
-                st.error(f"Colonna '{c}' mancante nel file Excel.")
-                return
-        
-        # Convert X and Y to numeric
-        df["X"] = pd.to_numeric(df["X"], errors="coerce")
-        df["Y"] = pd.to_numeric(df["Y"], errors="coerce")
-        
-        # Split into corridor and machine nodes
-        df_corridoio = df[df["Tag"] == "Corridoio"].copy()
-        df_macchina = df[df["Tag"] == "Macchina"].copy()
-        if df_corridoio.empty:
-            st.warning("Non ci sono corridoi: impossibile costruire il grafo completo.")
+    df = pd.read_excel(excel_file)
+    st.subheader("Anteprima del DataFrame")
+    st.dataframe(df.head())
+    
+    # 2. Verifica delle colonne necessarie
+    required_cols = ["X", "Y", "Tag", "Entity Name", "Size"]
+    for col in required_cols:
+        if col not in df.columns:
+            st.error(f"Colonna '{col}' mancante nel file Excel.")
             return
-        if df_macchina.empty:
-            st.warning("Non ci sono macchine: non ci sono coppie da calcolare.")
-        
-        # Create the master graph G (which will contain the MST of corridors)
-        G = nx.Graph()
-        for idx, row in df.iterrows():
-            G.add_node(
-                idx,
-                x=row["X"],
-                y=row["Y"],
-                tag=row["Tag"],
-                name=row["Entity Name"],
-                size=row.get("Size", "")
-            )
-        
-        # Function for weighted distance with directional constraints
-        def weighted_distance(n1, n2):
-            x1, y1, pref = G.nodes[n1]["x"], G.nodes[n1]["y"], G.nodes[n1].get("size", "")
-            x2, y2 = G.nodes[n2]["x"], G.nodes[n2]["y"]
-            base_weight = math.dist((x1, y1), (x2, y2))
-            
-            if pref == "destro" and x2 < x1:
-                return base_weight * 1000  # Penalizzazione più severa
-            elif pref == "sinistro" and x2 > x1:
-                return base_weight * 1000
-            elif pref == "alto" and y2 < y1:
-                return base_weight * 1000
-            elif pref == "basso" and y2 > y1:
-                return base_weight * 1000
-            else:
-                return base_weight * 1.0  # Mantiene il peso standard se segue la direzione
-        
-        # --- Build the constrained corridor connections respecting Size constraints ---
-        corr_indices = df_corridoio.index.tolist()
-        G_corr = nx.Graph()
-        G_corr.add_nodes_from(corr_indices)
-        for i in range(len(corr_indices)):
-            for j in range(i + 1, len(corr_indices)):
-                n1, n2 = corr_indices[i], corr_indices[j]
-                d = weighted_distance(n1, n2)
-                G_corr.add_edge(n1, n2, weight=d)
-        mst_corridoi = nx.minimum_spanning_tree(G_corr, weight='weight')
-        for (c1, c2) in mst_corridoi.edges():
-            G.add_edge(c1, c2, weight=G_corr[c1][c2]["weight"])
-        
-        # Ensure sequential connection of corridor nodes following size constraints
-        for idx in df_corridoio.index:
-            size_val = G.nodes[idx]["size"]
-            if size_val == "destro":
-                valid_corridors = [c for c in df_corridoio.index if G.nodes[c]["x"] > G.nodes[idx]["x"]]
-            elif size_val == "sinistro":
-                valid_corridors = [c for c in df_corridoio.index if G.nodes[c]["x"] < G.nodes[idx]["x"]]
-            elif size_val == "alto":
-                valid_corridors = [c for c in df_corridoio.index if G.nodes[c]["y"] > G.nodes[idx]["y"]]
-            elif size_val == "basso":
-                valid_corridors = [c for c in df_corridoio.index if G.nodes[c]["y"] < G.nodes[idx]["y"]]
-            else:
-                valid_corridors = df_corridoio.index.tolist()
-            
-            if valid_corridors:
-                next_corridor = min(valid_corridors, key=lambda c: weighted_distance(idx, c))
-                G.add_edge(idx, next_corridor, weight=weighted_distance(idx, next_corridor))
-        
-        # Compute shortest paths between machine nodes
-        st.subheader("Percorsi ottimizzati tra macchine con direzioni vincolate")
-        machine_indices = df_macchina.index.tolist()
-        if len(machine_indices) >= 2:
-            for m1, m2 in itertools.combinations(machine_indices, 2):
-                try:
-                    path_nodes = nx.shortest_path(G, m1, m2, weight='weight')
-                    path_edges = list(zip(path_nodes[:-1], path_nodes[1:]))
-                    
-                    fig, ax = plt.subplots(figsize=(10, 8))
-                    for (n1, n2) in path_edges:
-                        x1, y1 = G.nodes[n1]["x"], G.nodes[n1]["y"]
-                        x2, y2 = G.nodes[n2]["x"], G.nodes[n2]["y"]
-                        ax.plot([x1, x2], [y1, y2], color='red', linewidth=2)
-                    
-                    st.pyplot(fig)
-                except nx.NetworkXNoPath:
-                    st.write(f"Nessun percorso trovato tra {G.nodes[m1]['name']} e {G.nodes[m2]['name']}")
 
+    # Conversione delle coordinate in valori numerici
+    df["X"] = pd.to_numeric(df["X"], errors="coerce")
+    df["Y"] = pd.to_numeric(df["Y"], errors="coerce")
+    
+    # Separiamo corridoi e macchine
+    df_corridor = df[df["Tag"] == "Corridoio"].copy()
+    df_machine = df[df["Tag"] == "Macchina"].copy()
+    
+    if df_corridor.empty:
+        st.warning("Nessun corridoio presente. Impossibile costruire il grafo.")
+        return
+    if df_machine.empty:
+        st.warning("Nessuna macchina presente. Nessun percorso da calcolare.")
+    
+    # 3. Costruiamo il grafo diretto
+    DG = nx.DiGraph()
+    
+    # Aggiunta dei nodi con i relativi attributi. Per "Size" usiamo il valore in minuscolo e senza spazi.
+    for idx, row in df.iterrows():
+        size_val = str(row.get("Size", "")).strip().lower()
+        DG.add_node(
+            idx,
+            x=row["X"],
+            y=row["Y"],
+            tag=row["Tag"],
+            name=row["Entity Name"],
+            size=size_val
+        )
+    
+    # Lista degli indici dei corridoi
+    corridor_nodes = list(df_corridor.index)
+    
+    # 4. Funzioni di utilità
+    
+    # Calcola la distanza euclidea tra il nodo i e il nodo j
+    def euclidean(i, j):
+        x1, y1 = DG.nodes[i]["x"], DG.nodes[i]["y"]
+        x2, y2 = DG.nodes[j]["x"], DG.nodes[j]["y"]
+        return math.dist((x1, y1), (x2, y2))
+    
+    # Verifica se il nodo j è nella direzione richiesta a partire dal nodo i
+    def is_valid_direction(i, j, direction):
+        x1, y1 = DG.nodes[i]["x"], DG.nodes[i]["y"]
+        x2, y2 = DG.nodes[j]["x"], DG.nodes[j]["y"]
+        if direction == "destro":
+            return x2 > x1
+        elif direction == "sinistro":
+            return x2 < x1
+        elif direction == "alto":
+            return y2 > y1
+        elif direction == "basso":
+            return y2 < y1
+        else:
+            return False  # non è una direzione forzata
+    
+    # Per un nodo corridoio i, restituisce il candidato (tra gli altri corridoi) che soddisfa il vincolo direzionale
+    def get_forced_candidate(i):
+        direction = DG.nodes[i]["size"]
+        if direction not in {"destro", "sinistro", "alto", "basso"}:
+            return None
+        # Seleziona i candidati (esclude se stesso)
+        candidates = [j for j in corridor_nodes if j != i and is_valid_direction(i, j, direction)]
+        if not candidates:
+            return None
+        # Sceglie il candidato con la distanza euclidea minima
+        return min(candidates, key=lambda j: euclidean(i, j))
+    
+    # 5. Aggiunta degli archi forzati (solo per corridoi con direzione impostata)
+    forced_factor = 0.001  # fattore per ridurre artificialmente il peso degli archi forzati
+    forced_edges = {}      # memorizziamo {nodo: candidato} per debug/eventuale analisi
+    for i in corridor_nodes:
+        direction = DG.nodes[i]["size"]
+        if direction in {"destro", "sinistro", "alto", "basso"}:
+            candidate = get_forced_candidate(i)
+            if candidate is not None:
+                forced_edges[i] = candidate
+                weight = euclidean(i, candidate) * forced_factor
+                DG.add_edge(i, candidate, weight=weight, forced=True)
+    
+    # 6. Aggiunta degli archi di fallback (non forzati)
+    # Per garantire la connessione tra i nodi:
+    # - Se il nodo sorgente è un corridoio con direzione forzata, *non* aggiungiamo archi verso altri corridoi (fallback)
+    # - In tutti gli altri casi (corridoio senza vincolo, macchina, o collegamenti macchina-corridoio) li aggiungiamo.
+    all_nodes = list(DG.nodes())
+    for i in all_nodes:
+        for j in all_nodes:
+            if i == j:
+                continue
+            # Se il nodo sorgente è un corridoio forzato e il target è un corridoio, non aggiungiamo arco fallback
+            if DG.nodes[i]["tag"] == "Corridoio" and i in forced_edges and DG.nodes[j]["tag"] == "Corridoio":
+                continue
+            # Se non esiste già un arco (ad es. forzato) da i a j, aggiungiamo il fallback
+            if not DG.has_edge(i, j):
+                DG.add_edge(i, j, weight=euclidean(i, j), forced=False)
+    
+    # 7. Calcolo e visualizzazione dei percorsi tra macchine
+    st.subheader("Percorsi tra macchine (con forzatura nei corridoi)")
+    machine_nodes = list(df_machine.index)
+    if len(machine_nodes) < 2:
+        st.info("Non ci sono abbastanza macchine per calcolare i percorsi.")
+        return
+    
+    for m1, m2 in itertools.combinations(machine_nodes, 2):
+        try:
+            path_nodes = nx.shortest_path(DG, source=m1, target=m2, weight="weight")
+            path_edges = list(zip(path_nodes[:-1], path_nodes[1:]))
+            
+            # Visualizzazione del percorso
+            fig, ax = plt.subplots(figsize=(10, 8))
+            # Disegno dei nodi lungo il percorso
+            for n in path_nodes:
+                x, y = DG.nodes[n]["x"], DG.nodes[n]["y"]
+                ax.scatter(x, y, color='blue')
+                ax.text(x, y, DG.nodes[n]["name"], fontsize=9)
+            
+            # Disegno degli archi: quelli forzati vengono evidenziati in verde
+            for (u, v) in path_edges:
+                x1, y1 = DG.nodes[u]["x"], DG.nodes[u]["y"]
+                x2, y2 = DG.nodes[v]["x"], DG.nodes[v]["y"]
+                if DG[u][v].get("forced", False):
+                    ax.plot([x1, x2], [y1, y2], color='green', linewidth=3, label="Forzato")
+                else:
+                    ax.plot([x1, x2], [y1, y2], color='red', linewidth=2)
+            
+            ax.set_title(f"Percorso: {DG.nodes[m1]['name']} -> {DG.nodes[m2]['name']}")
+            st.pyplot(fig)
+        except nx.NetworkXNoPath:
+            st.write(f"Nessun percorso trovato tra {DG.nodes[m1]['name']} e {DG.nodes[m2]['name']}")
+    
 if __name__ == "__main__":
     main()
 
