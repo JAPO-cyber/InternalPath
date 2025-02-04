@@ -62,15 +62,15 @@ def main():
             base_weight = math.dist((x1, y1), (x2, y2))
             
             if x2 > x1 and pref == "destro":
-                return base_weight * 0.4
+                return base_weight * 0.5
             elif x2 < x1 and pref == "sinistro":
-                return base_weight * 0.4
+                return base_weight * 0.5
             elif y2 > y1 and pref == "alto":
-                return base_weight * 0.4
+                return base_weight * 0.5
             elif y2 < y1 and pref == "basso":
-                return base_weight * 0.4
+                return base_weight * 0.5
             else:
-                return base_weight * 1
+                return base_weight * 1.5
         
         # --- Build the MST for corridors ---
         corr_indices = df_corridoio.index.tolist()
@@ -85,30 +85,48 @@ def main():
         for (c1, c2) in mst_corridoi.edges():
             G.add_edge(c1, c2, weight=G_corr[c1][c2]["weight"])
         
-        # Visualization
-        fig, ax = plt.subplots(figsize=(10, 8))
-        for (n1, n2) in mst_corridoi.edges():
-            x1, y1 = G.nodes[n1]["x"], G.nodes[n1]["y"]
-            x2, y2 = G.nodes[n2]["x"], G.nodes[n2]["y"]
-            ax.plot([x1, x2], [y1, y2], color='blue', linewidth=2, alpha=0.7)
-        
-        corridor_nodes = [n for n in G.nodes() if G.nodes[n]["tag"] == "Corridoio"]
-        machine_nodes = [n for n in G.nodes() if G.nodes[n]["tag"] == "Macchina"]
-        if corridor_nodes:
-            x_corr = [G.nodes[n]["x"] for n in corridor_nodes]
-            y_corr = [G.nodes[n]["y"] for n in corridor_nodes]
-            ax.scatter(x_corr, y_corr, color='green', marker='o', label='Corridoio')
-        if machine_nodes:
-            x_mach = [G.nodes[n]["x"] for n in machine_nodes]
-            y_mach = [G.nodes[n]["y"] for n in machine_nodes]
-            ax.scatter(x_mach, y_mach, color='red', marker='s', label='Macchina')
-        ax.set_title("Mappa Corridoio-Macchina con Peso Direzionale")
-        ax.legend()
-        plt.grid(True)
-        st.pyplot(fig)
+        # Compute shortest paths between machine nodes
+        st.subheader("Percorsi ottimizzati tra macchine")
+        machine_indices = df_macchina.index.tolist()
+        if len(machine_indices) >= 2:
+            for m1, m2 in itertools.combinations(machine_indices, 2):
+                try:
+                    path_nodes = nx.shortest_path(G, m1, m2, weight='weight')
+                    path_edges = list(zip(path_nodes[:-1], path_nodes[1:]))
+                    
+                    fig, ax = plt.subplots(figsize=(10, 8))
+                    
+                    # Plot all edges in light color
+                    for (n1, n2) in G.edges():
+                        x1, y1 = G.nodes[n1]["x"], G.nodes[n1]["y"]
+                        x2, y2 = G.nodes[n2]["x"], G.nodes[n2]["y"]
+                        ax.plot([x1, x2], [y1, y2], color='lightgray', linewidth=1, alpha=0.5)
+                    
+                    # Highlight the shortest path
+                    for (n1, n2) in path_edges:
+                        x1, y1 = G.nodes[n1]["x"], G.nodes[n1]["y"]
+                        x2, y2 = G.nodes[n2]["x"], G.nodes[n2]["y"]
+                        ax.plot([x1, x2], [y1, y2], color='red', linewidth=2)
+                    
+                    # Plot nodes
+                    x_mach = [G.nodes[n]["x"] for n in machine_indices]
+                    y_mach = [G.nodes[n]["y"] for n in machine_indices]
+                    ax.scatter(x_mach, y_mach, color='blue', marker='s', label='Macchine')
+                    
+                    x_corr = [G.nodes[n]["x"] for n in corr_indices]
+                    y_corr = [G.nodes[n]["y"] for n in corr_indices]
+                    ax.scatter(x_corr, y_corr, color='green', marker='o', label='Corridoi')
+                    
+                    ax.set_title(f"Percorso ottimale tra {G.nodes[m1]['name']} e {G.nodes[m2]['name']}")
+                    ax.legend()
+                    plt.grid(True)
+                    st.pyplot(fig)
+                except nx.NetworkXNoPath:
+                    st.write(f"Nessun percorso trovato tra {G.nodes[m1]['name']} e {G.nodes[m2]['name']}")
 
 if __name__ == "__main__":
     main()
+
 
 
 
