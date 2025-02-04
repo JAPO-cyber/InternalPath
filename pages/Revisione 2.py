@@ -62,17 +62,17 @@ def main():
             base_weight = math.dist((x1, y1), (x2, y2))
             
             if pref == "destro" and x2 < x1:
-                return base_weight * 100  # Penalizzazione più severa
+                return base_weight * 1000  # Penalizzazione più severa
             elif pref == "sinistro" and x2 > x1:
-                return base_weight * 100
+                return base_weight * 1000
             elif pref == "alto" and y2 < y1:
-                return base_weight * 100
+                return base_weight * 1000
             elif pref == "basso" and y2 > y1:
-                return base_weight * 100
+                return base_weight * 1000
             else:
                 return base_weight * 1.0  # Mantiene il peso standard se segue la direzione
         
-        # --- Build the MST for corridors respecting Size constraints ---
+        # --- Build the constrained corridor connections respecting Size constraints ---
         corr_indices = df_corridoio.index.tolist()
         G_corr = nx.Graph()
         G_corr.add_nodes_from(corr_indices)
@@ -85,27 +85,23 @@ def main():
         for (c1, c2) in mst_corridoi.edges():
             G.add_edge(c1, c2, weight=G_corr[c1][c2]["weight"])
         
-        # Connect machines to the closest corridor node considering direction constraints
-        for m_idx in df_macchina.index:
-            size_val = G.nodes[m_idx]["size"]
+        # Ensure sequential connection of corridor nodes following size constraints
+        for idx in df_corridoio.index:
+            size_val = G.nodes[idx]["size"]
             if size_val == "destro":
-                valid_corridors = [c for c in df_corridoio.index if G.nodes[c]["x"] > G.nodes[m_idx]["x"]]
+                valid_corridors = [c for c in df_corridoio.index if G.nodes[c]["x"] > G.nodes[idx]["x"]]
             elif size_val == "sinistro":
-                valid_corridors = [c for c in df_corridoio.index if G.nodes[c]["x"] < G.nodes[m_idx]["x"]]
+                valid_corridors = [c for c in df_corridoio.index if G.nodes[c]["x"] < G.nodes[idx]["x"]]
             elif size_val == "alto":
-                valid_corridors = [c for c in df_corridoio.index if G.nodes[c]["y"] > G.nodes[m_idx]["y"]]
+                valid_corridors = [c for c in df_corridoio.index if G.nodes[c]["y"] > G.nodes[idx]["y"]]
             elif size_val == "basso":
-                valid_corridors = [c for c in df_corridoio.index if G.nodes[c]["y"] < G.nodes[m_idx]["y"]]
+                valid_corridors = [c for c in df_corridoio.index if G.nodes[c]["y"] < G.nodes[idx]["y"]]
             else:
                 valid_corridors = df_corridoio.index.tolist()
             
             if valid_corridors:
-                closest_corridor = min(valid_corridors, key=lambda c: weighted_distance(m_idx, c))
-                G.add_edge(m_idx, closest_corridor, weight=weighted_distance(m_idx, closest_corridor))
-            else:
-                # Fallback: connetti al corridoio più vicino senza considerare la direzione
-                fallback_corridor = min(df_corridoio.index, key=lambda c: math.dist((G.nodes[m_idx]["x"], G.nodes[m_idx]["y"]), (G.nodes[c]["x"], G.nodes[c]["y"])))
-                G.add_edge(m_idx, fallback_corridor, weight=math.dist((G.nodes[m_idx]["x"], G.nodes[m_idx]["y"]), (G.nodes[fallback_corridor]["x"], G.nodes[fallback_corridor]["y"])))
+                next_corridor = min(valid_corridors, key=lambda c: weighted_distance(idx, c))
+                G.add_edge(idx, next_corridor, weight=weighted_distance(idx, next_corridor))
         
         # Compute shortest paths between machine nodes
         st.subheader("Percorsi ottimizzati tra macchine con direzioni vincolate")
