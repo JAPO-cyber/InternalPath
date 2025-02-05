@@ -30,8 +30,8 @@ def greedy_path(G, source, target, pos):
       - Se il candidato non è il target, deve essere di tipo "Corridoio".
       - Se il nodo corrente è di tipo "Corridoio", viene applicata la regola direzionale
         utilizzando il valore della sua colonna "Size" per filtrare i possibili nodi successivi.
-      - Se il nodo corrente è una "Macchina" (tipicamente la partenza), non viene applicato
-        alcun filtro direzionale.
+      - Se il nodo corrente è una "Macchina" (tipicamente il punto di partenza), non viene
+        applicato alcun filtro direzionale.
     Restituisce la lista di nodi che compongono il percorso oppure None se non ne trova uno.
     """
     path = [source]
@@ -103,13 +103,18 @@ def display_graph(G, pos, corridors, machines):
 def main():
     st.title("Collegamento Macchine Tramite Corridoi – Calcolo di tutte le coppie")
     
-    # 1. Caricamento del file Excel
-    excel_file = st.file_uploader("Carica file Excel (X, Y, Tag, Entity Name, Size)", type=["xls", "xlsx"])
-    if not excel_file:
-        st.info("Carica un file Excel per iniziare.")
+    # 1. Caricamento del file (Excel o CSV)
+    uploaded_file = st.file_uploader("Carica file Excel (xls, xlsx) o CSV", type=["xls", "xlsx", "csv"])
+    if not uploaded_file:
+        st.info("Carica un file per iniziare.")
         return
 
-    df = pd.read_excel(excel_file)
+    # Determiniamo il tipo di file in base all'estensione
+    if uploaded_file.name.lower().endswith('.csv'):
+        df = pd.read_csv(uploaded_file)
+    else:
+        df = pd.read_excel(uploaded_file)
+    
     st.subheader("Anteprima del DataFrame")
     st.dataframe(df.head())
     
@@ -117,7 +122,7 @@ def main():
     required_cols = ["X", "Y", "Tag", "Entity Name", "Size"]
     for col in required_cols:
         if col not in df.columns:
-            st.error(f"Colonna '{col}' mancante nel file Excel.")
+            st.error(f"Colonna '{col}' mancante nel file.")
             return
 
     # Conversione delle coordinate in numerico
@@ -191,9 +196,7 @@ def main():
         if nx.has_path(G, source, target):
             path_euclid = nx.shortest_path(G, source=source, target=target, weight="weight")
             length_euclid = nx.shortest_path_length(G, source=source, target=target, weight="weight")
-            # Stringa del percorso (con entity_name)
             percorso_ottimale = " --> ".join(G.nodes[n]["entity_name"] for n in path_euclid)
-            # Dettaglio delle distanze per ogni tratto
             dettaglio_ottimale = breakdown_path(path_euclid, pos)
         else:
             percorso_ottimale = "Nessun percorso"
@@ -242,7 +245,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 
 
