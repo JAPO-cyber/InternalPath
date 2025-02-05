@@ -4,11 +4,12 @@ import networkx as nx
 import math
 import itertools
 import matplotlib.pyplot as plt
+import io
 
 def is_valid_direction(current_pos, candidate_pos, direction):
     """
-    Verifica se il candidato (x2,y2) rispetta la condizione direzionale 
-    rispetto al punto corrente (x1,y1) in base alla direzione scelta.
+    Verifica se il candidato (x2, y2) rispetta la condizione direzionale
+    rispetto al punto corrente (x1, y1) in base alla direzione fornita.
     """
     x1, y1 = current_pos
     x2, y2 = candidate_pos
@@ -22,12 +23,15 @@ def is_valid_direction(current_pos, candidate_pos, direction):
         return y2 < y1
     return False
 
-def greedy_path(G, source, target, pos, direction):
+def greedy_path(G, source, target, pos):
     """
-    Algoritmo greedy che, partendo da 'source', seleziona a ogni passo il nodo adiacente 
-    (che sia un corridoio oppure il nodo target) che rispetta la condizione direzionale e 
-    che sia il più vicino (in distanza euclidea) al nodo corrente.
-    
+    Algoritmo greedy che, partendo da 'source', seleziona ad ogni passo il nodo adiacente
+    che rispetti i seguenti vincoli:
+      - Se il candidato non è il target, deve essere di tipo "Corridoio".
+      - Se il nodo corrente è di tipo "Corridoio", viene applicata la regola direzionale
+        utilizzando il valore della sua colonna "Size" per filtrare i possibili nodi successivi.
+      - Se il nodo corrente è una "Macchina" (tipicamente la partenza), non viene applicato
+        alcun filtro direzionale.
     Restituisce la lista di nodi che compongono il percorso oppure None se non ne trova uno.
     """
     path = [source]
@@ -39,48 +43,65 @@ def greedy_path(G, source, target, pos, direction):
         for neigh in G.neighbors(current):
             if neigh in visited:
                 continue
-            # Considera il vicino se è il nodo target o se è un corridoio
-            if neigh == target or G.nodes[neigh]["tag"] == "Corridoio":
-                # Controlla la regola direzionale
-                if is_valid_direction(pos[current], pos[neigh], direction):
-                    candidates.append(neigh)
+
+            # Se il candidato non è il target, deve essere un "Corridoio"
+            if neigh != target and G.nodes[neigh]["tag"] == "Macchina":
+                continue
+
+            # Se il nodo corrente è di tipo "Corridoio", applichiamo la regola direzionale
+            if G.nodes[current]["tag"] == "Corridoio":
+                direction = G.nodes[current]["size"]
+                if not is_valid_direction(pos[current], pos[neigh], direction):
+                    continue
+
+            candidates.append(neigh)
+
         if not candidates:
-            return None  # Nessun candidato valido, impossibile proseguire
-        # Seleziona il candidato con distanza minima dal nodo corrente
+            return None  # Nessun candidato valido trovato
+
+        # Selezioniamo il candidato più vicino (in distanza euclidea) rispetto al nodo corrente
         next_node = min(candidates, key=lambda n: math.dist(pos[current], pos[n]))
         path.append(next_node)
         visited.add(next_node)
         current = next_node
+
+        # Sicurezza per evitare cicli infiniti
         if len(path) > len(G.nodes()):
-            return None  # Sicurezza per evitare cicli infiniti
+            return None
+
     return path
+
+def breakdown_path(path, pos):
+    """
+    Data una lista di nodi (path) e il dizionario pos,
+    restituisce una stringa con le distanze (in m) di ciascun tratto separate da " + ".
+    """
+    segments = []
+    for i in range(len(path) - 1):
+        d = math.dist(pos[path[i]], pos[path[i+1]])
+        segments.append(f"{d:.2f}")
+    return " + ".join(segments)
 
 def display_graph(G, pos, corridors, machines):
     """
-    Visualizza il grafo con i nodi etichettati e colori distinti:
-      - Corridoi: skyblue
-      - Macchine: lightgreen
+    Visualizza il grafo con:
+      - Nodi "Corridoio" in skyblue
+      - Nodi "Macchina" in lightgreen
+      - Etichette che mostrano l'entity_name ed l'ID
     """
     fig, ax = plt.subplots(figsize=(8, 6))
-    
-    # Disegna gli archi con un'opacità ridotta
     nx.draw_networkx_edges(G, pos, ax=ax, alpha=0.5)
-    
-    # Disegna i nodi
     nx.draw_networkx_nodes(G, pos, nodelist=corridors, node_color="skyblue", label="Corridoio", node_size=100, ax=ax)
     nx.draw_networkx_nodes(G, pos, nodelist=machines, node_color="lightgreen", label="Macchina", node_size=100, ax=ax)
-    
-    # Aggiunge le etichette per ogni nodo (mostra il nome e l'ID)
     labels = {node: f"{G.nodes[node]['entity_name']}\n(ID: {node})" for node in G.nodes()}
     nx.draw_networkx_labels(G, pos, labels, font_size=8, ax=ax)
-    
     ax.set_title("Grafico dei Nodi")
     ax.legend()
     ax.axis("off")
     st.pyplot(fig)
 
 def main():
-    st.title("Collegamento Macchine Tramite Corridoi – Percorsi e Visualizzazione")
+    st.title("Collegamento Macchine Tramite Corridoi – Calcolo di tutte le coppie")
     
     # 1. Caricamento del file Excel
     excel_file = st.file_uploader("Carica file Excel (X, Y, Tag, Entity Name, Size)", type=["xls", "xlsx"])
@@ -114,7 +135,7 @@ def main():
         st.warning("Nessuna macchina presente.")
         return
     
-    # Uniamo i dati in un unico DataFrame
+    # Unione dei dati in un unico DataFrame
     df_all = pd.concat([df_corridor, df_machine])
     
     # 3. Costruzione del grafo
@@ -124,8 +145,6 @@ def main():
                                help="Due nodi vengono collegati se la distanza euclidea è ≤ a questo valore.")
     
     G = nx.Graph()
-    
-    # Aggiungiamo i nodi; utilizziamo l'indice del DataFrame come ID
     for idx, row in df_all.iterrows():
         G.add_node(idx, 
                    x=row["X"], 
@@ -134,7 +153,7 @@ def main():
                    entity_name=row["Entity Name"], 
                    size=row["Size"])
     
-    # Aggiungiamo gli archi: solo se la distanza ≤ max_distance e se almeno uno dei due nodi è un Corridoio
+    # Aggiunta degli archi: si collegano due nodi se la distanza è ≤ max_distance e almeno uno è un Corridoio.
     nodes = list(G.nodes(data=True))
     for (i, data_i), (j, data_j) in itertools.combinations(nodes, 2):
         dist = math.dist((data_i["x"], data_i["y"]), (data_j["x"], data_j["y"]))
@@ -150,66 +169,76 @@ def main():
     corridors = [n for n, d in G.nodes(data=True) if d["tag"] == "Corridoio"]
     machines = [n for n, d in G.nodes(data=True) if d["tag"] == "Macchina"]
     
-    # 4. Visualizzazione del grafo dei nodi
+    # 4. Visualizzazione del grafo
     st.subheader("Grafico dei Nodi")
     display_graph(G, pos, corridors, machines)
     
-    # 5. Calcolo dei percorsi tra macchine (tramite corridoi)
-    st.subheader("Calcolo dei percorsi tra macchine (tramite corridoi)")
+    # 5. Calcolo dei percorsi per tutte le coppie di macchine
+    st.subheader("Calcolo dei percorsi per tutte le coppie di macchine")
+    results = []
+    # Ordiniamo i nodi macchina (per entity_name ad es.)
+    machine_nodes = sorted([n for n, d in G.nodes(data=True) if d["tag"] == "Macchina"],
+                           key=lambda n: G.nodes[n]["entity_name"])
     
-    # Creiamo le opzioni per selezionare le macchine
-    machine_options = [(n, f"{d['entity_name']} (ID: {n})") 
-                       for n, d in G.nodes(data=True) if d["tag"] == "Macchina"]
-    machine_options = sorted(machine_options, key=lambda x: x[1])
-    
-    start_machine = st.selectbox("Macchina di Partenza", machine_options, format_func=lambda x: x[1])
-    end_machine = st.selectbox("Macchina di Destinazione", machine_options, format_func=lambda x: x[1])
-    
-    # Selezione della direzione per il percorso basato su Size
-    direction = st.selectbox("Direzione per il percorso basato su Size", 
-                             ["destro", "sinistro", "alto", "basso"])
-    
-    if st.button("Calcola Percorsi"):
-        source = start_machine[0]
-        target = end_machine[0]
+    for source, target in itertools.combinations(machine_nodes, 2):
+        source_name = G.nodes[source]["entity_name"]
+        target_name = G.nodes[target]["entity_name"]
         
-        st.markdown("### Percorso con distanza euclidea minima (Dijkstra)")
+        # Collegamento macchina (es. "M1 --> M2")
+        collegamento = f"{source_name} --> {target_name}"
+        
+        # Percorso ottimale (Dijkstra)
         if nx.has_path(G, source, target):
             path_euclid = nx.shortest_path(G, source=source, target=target, weight="weight")
-            path_euclid_str = " -> ".join(f"{G.nodes[n]['entity_name']} (ID: {n})" for n in path_euclid)
-            st.write(path_euclid_str)
-            
-            # Evidenzia il percorso calcolato con Dijkstra
-            path_edges = list(zip(path_euclid, path_euclid[1:]))
-            fig_e, ax_e = plt.subplots(figsize=(8, 6))
-            nx.draw_networkx_edges(G, pos, ax=ax_e, alpha=0.3)
-            nx.draw_networkx_nodes(G, pos, nodelist=corridors, node_color="skyblue", node_size=100, ax=ax_e)
-            nx.draw_networkx_nodes(G, pos, nodelist=machines, node_color="lightgreen", node_size=100, ax=ax_e)
-            nx.draw_networkx_edges(G, pos, edgelist=path_edges, edge_color="red", width=2, ax=ax_e)
-            ax_e.set_title("Percorso Euclideo Minimo (Dijkstra)")
-            ax_e.axis("off")
-            st.pyplot(fig_e)
+            length_euclid = nx.shortest_path_length(G, source=source, target=target, weight="weight")
+            # Stringa del percorso (con entity_name)
+            percorso_ottimale = " --> ".join(G.nodes[n]["entity_name"] for n in path_euclid)
+            # Dettaglio delle distanze per ogni tratto
+            dettaglio_ottimale = breakdown_path(path_euclid, pos)
         else:
-            st.error("Nessun percorso trovato con il metodo euclideo.")
+            percorso_ottimale = "Nessun percorso"
+            dettaglio_ottimale = ""
+            length_euclid = None
         
-        st.markdown("### Percorso basato sulla regola Size (Algoritmo Greedy)")
-        path_greedy = greedy_path(G, source, target, pos, direction)
+        # Percorso greedy basato su Size
+        path_greedy = greedy_path(G, source, target, pos)
         if path_greedy is not None:
-            path_greedy_str = " -> ".join(f"{G.nodes[n]['entity_name']} (ID: {n})" for n in path_greedy)
-            st.write(path_greedy_str)
-            
-            # Evidenzia il percorso calcolato con l'algoritmo greedy
-            path_edges_g = list(zip(path_greedy, path_greedy[1:]))
-            fig_g, ax_g = plt.subplots(figsize=(8, 6))
-            nx.draw_networkx_edges(G, pos, ax=ax_g, alpha=0.3)
-            nx.draw_networkx_nodes(G, pos, nodelist=corridors, node_color="skyblue", node_size=100, ax=ax_g)
-            nx.draw_networkx_nodes(G, pos, nodelist=machines, node_color="lightgreen", node_size=100, ax=ax_g)
-            nx.draw_networkx_edges(G, pos, edgelist=path_edges_g, edge_color="purple", width=2, ax=ax_g)
-            ax_g.set_title("Percorso basato su Size (Greedy)")
-            ax_g.axis("off")
-            st.pyplot(fig_g)
+            length_greedy = sum(math.dist(pos[path_greedy[i]], pos[path_greedy[i+1]])
+                                for i in range(len(path_greedy)-1))
+            percorso_greedy = " --> ".join(G.nodes[n]["entity_name"] for n in path_greedy)
+            dettaglio_greedy = breakdown_path(path_greedy, pos)
         else:
-            st.error("Nessun percorso trovato con il metodo basato su Size.")
+            percorso_greedy = "Nessun percorso"
+            dettaglio_greedy = ""
+            length_greedy = None
+        
+        results.append({
+            "Collegamento Macchina": collegamento,
+            "Percorso Ottimale Seguito": percorso_ottimale,
+            "Dettaglio Distanze Ottimale": dettaglio_ottimale,
+            "Lunghezza Totale Ottimale": length_euclid,
+            "Percorso Greedy Seguito": percorso_greedy,
+            "Dettaglio Distanze Greedy": dettaglio_greedy,
+            "Lunghezza Totale Greedy": length_greedy,
+        })
+    
+    df_results = pd.DataFrame(results)
+    st.subheader("Risultati per tutte le coppie di macchine")
+    st.dataframe(df_results)
+    
+    # 6. Download del file Excel con i risultati
+    towrite = io.BytesIO()
+    with pd.ExcelWriter(towrite, engine='xlsxwriter') as writer:
+        df_results.to_excel(writer, index=False, sheet_name='Risultati')
+        writer.save()
+    towrite.seek(0)
+    
+    st.download_button(
+        label="Scarica file Excel",
+        data=towrite,
+        file_name="risultati_percorsi.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 if __name__ == "__main__":
     main()
