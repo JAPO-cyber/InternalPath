@@ -230,17 +230,19 @@ def main():
     st.dataframe(df_results)
     
     # 6. Download del file Excel con i risultati
+    # Creazione del file Excel in memoria
     towrite = io.BytesIO()
     with pd.ExcelWriter(towrite, engine='xlsxwriter') as writer:
         df_results.to_excel(writer, index=False, sheet_name='Risultati')
-        writer.save()
+        # Non è necessario chiamare writer.save() qui!
     towrite.seek(0)
-    
+
     st.download_button(
         label="Scarica file Excel",
         data=towrite,
         file_name="risultati_percorsi.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
     )
 
 if __name__ == "__main__":
