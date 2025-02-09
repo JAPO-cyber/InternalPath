@@ -122,12 +122,11 @@ def Creazione_G(tipologia_grafo,df_all,max_distance):
             for corridor in corridor_nodes:
                 corridor_pos = (G.nodes[corridor]["x"], G.nodes[corridor]["y"])
                 dist = math.dist(machine_pos, corridor_pos)
-                # Si considera solo la distanza, senza il controllo del vincolo direzionale.
-                if dist < best_dist and dist <= max_distance:
+                if dist < best_dist:
                     best_dist = dist
                     best_corridor = corridor
-                    if best_corridor is not None:
-                        G.add_edge(machine, best_corridor, weight=best_dist)
+            if best_corridor is not None and best_dist <= max_distance:
+                G.add_edge(machine, best_corridor, weight=best_dist)
         return G
 
 def main():
