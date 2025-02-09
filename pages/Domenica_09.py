@@ -34,20 +34,21 @@ def is_valid_direction_filter(current_pos, candidate_pos, direction,stream):
     dist_x = abs(x1 - x2)
     dist_y = abs(y1 - y2)
     st.write(f"Current: {current_pos}, Candidate: {candidate_pos}")
-    st.write(f"dist_x: {dist_x}, dist_y: {dist_y}, direction: {direction}")
+    #st.write(f"dist_x: {dist_x}, dist_y: {dist_y}, direction: {direction}")
     x = False
     
     if not isinstance(direction, str):
         direction = str(direction)
         
     if direction == "verticale":
+        st.write(f"Sono nell'IF verticale")
         if dist_y>dist_x: x=False  
         else: x=False
     elif direction == "orizzontale":
         if dist_y<dist_x:   x=False  
         else: x=False
     else: x=True  
-      # Debugging
+     
     return x
 
 def breakdown_path(path, pos):
