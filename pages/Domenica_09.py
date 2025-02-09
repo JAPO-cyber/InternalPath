@@ -96,8 +96,8 @@ def Creazione_G(tipologia_grafo,df_all,max_distance):
         # 1. Connessione fra Corridoi:
         corridor_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Corridoio"]
         for i, j in itertools.combinations(corridor_nodes, 2):
-            entity_i=G.nodes[i]["Entity Name"]
-            entity_j=G.nodes[j]["Entity Name"]
+            entity_i=G.nodes[i]["entity_name"]
+            entity_j=G.nodes[j]["entity_name"]
             pos_i = (G.nodes[i]["x"], G.nodes[i]["y"])
             pos_j = (G.nodes[j]["x"], G.nodes[j]["y"])
             dist = abs(pos_j[0] - pos_i[0]) + abs(pos_j[1] - pos_i[1])
