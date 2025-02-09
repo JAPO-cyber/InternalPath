@@ -279,23 +279,22 @@ def main():
         # --- Percorso Greedy con vincolo del primo Corridoio ---
         if corridor_neighbors:
             nearest_corridor = min(corridor_neighbors, key=lambda n: math.dist(pos[source], pos[n]))
-            sub_path = greedy_path(G, nearest_corridor, target, pos)
-            if sub_path is not None:
+            if nx.has_path(G, nearest_corridor, target):
+                sub_path = nx.shortest_path(G, source=nearest_corridor, target=target, weight="weight")
+                length_sub = nx.shortest_path_length(G, source=nearest_corridor, target=target, weight="weight")
                 full_path = [source] + sub_path  # Forzo il passaggio: Macchina -> Corridoio -> ... -> Target
-                length_greedy = math.dist(pos[source], pos[nearest_corridor]) + sum(
-                    math.dist(pos[full_path[i]], pos[full_path[i+1]])
-                    for i in range(len(full_path)-1)
-                )
-                percorso_greedy = " --> ".join(G.nodes[n]["entity_name"] for n in full_path)
-                dettaglio_greedy = breakdown_path(full_path, pos)
+                length_euclid = math.dist(pos[source], pos[nearest_corridor]) + length_sub
+                percorso_ottimale = " --> ".join(G.nodes[n]["entity_name"] for n in full_path)
+                dettaglio_ottimale = breakdown_path(full_path, pos)
             else:
-                percorso_greedy = "Nessun percorso"
-                dettaglio_greedy = ""
-                length_greedy = None
+                percorso_ottimale = "Nessun percorso"
+                dettaglio_ottimale = ""
+                length_euclid = None
         else:
-            percorso_greedy = "Nessun percorso"
-            dettaglio_greedy = ""
-            length_greedy = None
+            percorso_ottimale = "Nessun percorso"
+            dettaglio_ottimale = ""
+            length_euclid = None
+
         
         results.append({
             "Collegamento Macchina": collegamento,
