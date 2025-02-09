@@ -181,9 +181,9 @@ def main():
         # Se entrambi gli assi variano, significa che il collegamento sarebbe in diagonale.
         # Calcola la distanza "Manhattan" (in questo caso coincide con la distanza euclidea
         # se la variazione è solo lungo un asse)
-        #dist = abs(pos_j[0] - pos_i[0]) + abs(pos_j[1] - pos_i[1])
+        dist = abs(pos_j[0] - pos_i[0]) + abs(pos_j[1] - pos_i[1])
         # Distanza euclidea
-        dist = math.dist(pos_i, pos_j)
+        #dist = math.dist(pos_i, pos_j)
         if dist <= max_distance:
             if is_valid_direction(pos_i, pos_j, G.nodes[j]["size"]):
                 G.add_edge(i, j, weight=dist)
