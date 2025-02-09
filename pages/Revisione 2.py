@@ -151,7 +151,7 @@ def main():
     # 3. Costruzione del grafo
     st.subheader("Costruzione del grafo")
     max_distance = st.slider("Distanza massima per collegare i nodi", 
-                               min_value=0.0, max_value=5.0, value=2.5,
+                               min_value=0.0, max_value=10.0, value=5.0,
                                help="Due nodi vengono collegati se la distanza euclidea è ≤ a questo valore.")
     
     G = nx.Graph()
@@ -163,13 +163,32 @@ def main():
                    entity_name=row["Entity Name"], 
                    size=row["Size"])
     
-    # Aggiunta degli archi: si collegano due nodi se la distanza è ≤ max_distance e almeno uno è un Corridoio.
-    nodes = list(G.nodes(data=True))
-    for (i, data_i), (j, data_j) in itertools.combinations(nodes, 2):
-        dist = math.dist((data_i["x"], data_i["y"]), (data_j["x"], data_j["y"]))
+    # --------------------------
+    # Modifica: aggiunta degli archi
+    # 1. Connettiamo fra loro tutti i nodi di tipo Corridoio se la distanza è ≤ max_distance.
+    corridor_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Corridoio"]
+    for i, j in itertools.combinations(corridor_nodes, 2):
+        pos_i = (G.nodes[i]["x"], G.nodes[i]["y"])
+        pos_j = (G.nodes[j]["x"], G.nodes[j]["y"])
+        dist = math.dist(pos_i, pos_j)
         if dist <= max_distance:
-            if data_i["tag"] == "Corridoio" or data_j["tag"] == "Corridoio":
-                G.add_edge(i, j, weight=dist)
+            G.add_edge(i, j, weight=dist)
+    
+    # 2. Per ogni nodo di tipo Macchina, lo colleghiamo una sola volta al Corridoio più vicino
+    machine_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Macchina"]
+    for machine in machine_nodes:
+        machine_pos = (G.nodes[machine]["x"], G.nodes[machine]["y"])
+        best_corridor = None
+        best_dist = float('inf')
+        for corridor in corridor_nodes:
+            corridor_pos = (G.nodes[corridor]["x"], G.nodes[corridor]["y"])
+            dist = math.dist(machine_pos, corridor_pos)
+            if dist < best_dist:
+                best_dist = dist
+                best_corridor = corridor
+        if best_corridor is not None and best_dist <= max_distance:
+            G.add_edge(machine, best_corridor, weight=best_dist)
+    # --------------------------
     
     st.write("Numero totale di nodi:", G.number_of_nodes())
     st.write("Numero totale di archi:", G.number_of_edges())
@@ -270,3 +289,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
