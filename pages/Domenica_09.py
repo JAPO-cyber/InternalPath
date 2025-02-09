@@ -29,20 +29,13 @@ def is_valid_direction(current_pos, candidate_pos, direction):
     return True
 
 def is_valid_direction_filter(current_pos, candidate_pos, direction,stream):
-    
     x1, y1 = current_pos
     x2, y2 = candidate_pos
     dist_x = abs(x1 - x2)
     dist_y = abs(y1 - y2)
-    
+    x = False
     if direction == "verticale":
-        if dist_y>dist_x: 
-          x=True  
-        else:
-            x=True
-    else: x=True
-
-    return x
+        x = dist_y > dist_x
 
 def breakdown_path(path, pos):
     """
