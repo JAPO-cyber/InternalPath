@@ -39,10 +39,11 @@ def is_valid_direction_filter(entity_i,entity_j,current_pos, candidate_pos, dire
     x = False
     
     if not isinstance(direction, str):
-        direction = str(direction)
-        
+        direction = str(direction)    
     if not isinstance(stream, str):
         stream = str(stream)
+
+    
         
     if stream == "destro":
         if x2 > x1: x=False 
