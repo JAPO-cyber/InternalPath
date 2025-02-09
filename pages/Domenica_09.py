@@ -36,7 +36,11 @@ def is_valid_direction_filter(current_pos, candidate_pos, direction,stream):
     st.write(f"Current: {current_pos}, Candidate: {candidate_pos}")
     st.write(f"dist_x: {dist_x}, dist_y: {dist_y}, direction: {direction}")
     x = False
-    if direction.strip().lower()  == "verticale":
+    
+    if not isinstance(direction, str):
+        direction = str(direction)
+        
+    if direction  == "verticale":
         x = dist_y > dist_x
         st.write(f"Condition met? {x}")  # Debugging
     return x
