@@ -15,18 +15,22 @@ def is_valid_direction(current_pos, candidate_pos, direction):
     x2, y2 = candidate_pos
     dist_x = abs(x1 - x2)
     dist_y = abs(y1 - y2)
-
-    if direction == "verticale":
+    x = False
+    
+    if not isinstance(direction, str):
+        direction = str(direction)
+    if not isinstance(stream, str):
+        stream = str(stream)
+    if direction == "verticale":      
         if dist_y>dist_x: 
-            return True    
-        else:
-            return False
+            x=True 
+        else: 
+            x=False 
     elif direction == "orizzontale":
-        if dist_y<dist_x: 
-            return True    
-        else:
-            return False
-    return True
+        if dist_y<dist_x:   x=False  
+        else: x=False
+    else: x=True
+    return x
 
 def is_valid_direction_filter(entity_i,entity_j,current_pos, candidate_pos, direction,stream):
     x1, y1 = current_pos
