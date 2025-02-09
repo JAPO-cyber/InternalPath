@@ -220,23 +220,27 @@ def main():
     st.subheader("Grafico dei Nodi")
     display_graph(G, pos, corridors, machines)
 
-    # Stampa a schermo tutti i corridoi trovati e le relative distanze
-    st.subheader("Elenco dei Corridoi e Distanze Relative")
-    for corridor in corridor_nodes:
-        # Recupera il nome del corridoio (o un identificativo)
-        corridor_name = G.nodes[corridor].get("entity_name", f"ID: {corridor}")
-        st.write(f"**Corridoio:** {corridor_name} (ID: {corridor})")
-        # Per ogni corridoio, raccogliamo i collegamenti con altri corridoi
-        collegamenti = []
-        for neighbor in G.neighbors(corridor):
-            if G.nodes[neighbor]["tag"] == "Corridoio":
-                distance = G[corridor][neighbor]["weight"]
-                neighbor_name = G.nodes[neighbor].get("entity_name", f"ID: {neighbor}")
-                collegamenti.append(f"{neighbor_name} (ID: {neighbor}) -> {distance:.2f} m")
-        if collegamenti:
-            st.write("Collegamenti:", ", ".join(collegamenti))
-        else:
-            st.write("Nessun collegamento con altri corridoi.")
+    # Creazione della tabella per le connessioni fra corridoi (solo gli archi tra nodi di tipo Corridoio)
+    corridor_edges = []
+    for u, v, data_dict in G.edges(data=True):
+        # Verifichiamo che entrambi i nodi siano di tipo "Corridoio"
+        if G.nodes[u]["tag"] == "Corridoio" and G.nodes[v]["tag"] == "Corridoio":
+            corridor_edges.append({
+                "Corridoio 1": G.nodes[u].get("entity_name", f"ID: {u}"),
+                "Corridoio 2": G.nodes[v].get("entity_name", f"ID: {v}"),
+                "Distanza (m)": data_dict["weight"]
+            })
+    
+    # Creiamo il DataFrame dalle connessioni trovate
+    df_corridor_edges = pd.DataFrame(corridor_edges)
+    
+    # Visualizziamo il DataFrame in forma tabellare e permettiamo la modifica interattiva
+    st.subheader("Tabella delle Connessioni fra Corridoi")
+    edited_edges = st.data_editor(df_corridor_edges, num_rows="dynamic", key="corridor_edges_editor")
+    
+    # Se desideri anche visualizzare la tabella modificata
+    st.write("Tabella modificata:")
+    st.dataframe(edited_edges)
     
     # 5. Calcolo dei percorsi per tutte le coppie di macchine
     st.subheader("Calcolo dei percorsi per tutte le coppie di macchine")
