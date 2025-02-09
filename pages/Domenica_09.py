@@ -58,9 +58,16 @@ def is_valid_direction_filter(current_pos, candidate_pos, direction,stream):
             else: True    
         else:
             return False
-    return True
-
-
+    else:
+        if stream=="destro":
+             return x2<x1
+        elif stream=="sinistro":
+             return x2>x1
+        elif stream=="alto":
+             return y2<y1
+        elif stream=="basso":
+             return y2>y1  
+        else: True 
 def breakdown_path(path, pos):
     """
     Data una lista di nodi (path) e il dizionario pos,
