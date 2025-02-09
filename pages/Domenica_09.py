@@ -42,16 +42,14 @@ def is_valid_direction_filter(entity_i,entity_j,current_pos, candidate_pos, dire
     if not isinstance(stream, str):
         stream = str(stream)
 
-    
-        
     if stream == "destro":
-        if x2 > x1: x=False 
+        if x2 > x1: x=True 
     elif stream == "sinistro":
-        if x2 < x1: x=False 
+        if x2 < x1: x=True 
     elif stream == "alto":
-        if y2 > y1: x=False 
+        if y2 > y1: x=True  
     elif stream == "basso":
-        if y2 < y1: x=False 
+        if y2 < y1: x=True
     else: x=True
     st.write(f"Current: {entity_i}, Candidate: {entity_j},stream:{stream},L'output della funzione è {x}")
 
