@@ -29,10 +29,10 @@ def greedy_path(G, source, target, pos):
     Algoritmo greedy che, partendo da 'source', seleziona ad ogni passo il nodo adiacente
     che rispetta i seguenti vincoli:
       - Se il candidato non è il target, deve essere di tipo "Corridoio".
-      - Se il nodo corrente è di tipo "Corridoio", viene applicata la regola direzionale
-        utilizzando il valore della sua colonna "Size" per filtrare i possibili nodi successivi.
-      - Se il nodo corrente è una "Macchina" (tipicamente il punto di partenza), 
-        al primo salto non viene considerato un altro nodo Macchina (così da forzare il passaggio al corridoio più vicino).
+      - Se il nodo corrente è di tipo "Corridoio", viene applicato il vincolo direzionale 
+        (basato su Size). Se il nodo corrente è di tipo Macchina, il vincolo non viene applicato.
+      - Al primo salto, se il nodo di partenza è una Macchina, si forza il collegamento 
+        con un Corridoio (scartando quindi altri eventuali nodi Macchina).
     Restituisce la lista di nodi che compongono il percorso oppure None se non ne trova uno.
     """
     path = [source]
@@ -45,16 +45,15 @@ def greedy_path(G, source, target, pos):
             if neigh in visited:
                 continue
 
-            # Se siamo al primo passo e il nodo corrente è una Macchina,
-            # non possiamo scegliere come candidato un'altra Macchina (anche se fosse il target).
+            # Al primo salto: se il nodo corrente è una Macchina, non consideriamo altri nodi Macchina
             if len(path) == 1 and G.nodes[current]["tag"] == "Macchina" and G.nodes[neigh]["tag"] == "Macchina":
                 continue
 
-            # Se il candidato non è il target, deve essere un "Corridoio"
+            # Se il candidato non è il target, deve essere un Corridoio
             if neigh != target and G.nodes[neigh]["tag"] == "Macchina":
                 continue
 
-            # Se il nodo corrente è di tipo "Corridoio", applichiamo la regola direzionale
+            # Applica il controllo direzionale SOLO se il nodo corrente è un Corridoio.
             if G.nodes[current]["tag"] == "Corridoio":
                 direction = G.nodes[current]["size"]
                 if not is_valid_direction(pos[current], pos[neigh], direction):
@@ -80,7 +79,7 @@ def greedy_path(G, source, target, pos):
 def breakdown_path(path, pos):
     """
     Data una lista di nodi (path) e il dizionario pos,
-    restituisce una stringa con le distanze (in m) di ciascun tratto separate da " + ".
+    restituisce una stringa con le distanze (in m) di ciascun tratto, separate da " + ".
     """
     segments = []
     for i in range(len(path) - 1):
@@ -121,10 +120,14 @@ def main():
     else:
         df = pd.read_excel(uploaded_file)
     
-    st.subheader("Anteprima del DataFrame")
-    st.dataframe(df.head())
+    # 2. Anteprima e modifica del DataFrame (solo le colonne "Entity Name" e "Size")
+    st.subheader("Anteprima e modifica dei dati (solo 'Entity Name' e 'Size')")
+    # Visualizziamo e permettiamo la modifica soltanto di queste due colonne
+    edited_data = st.experimental_data_editor(df[['Entity Name', 'Size']], num_rows="dynamic")
+    # Aggiorniamo il DataFrame originale con le modifiche effettuate
+    df.update(edited_data)
     
-    # 2. Verifica delle colonne necessarie
+    # Verifica delle colonne necessarie
     required_cols = ["X", "Y", "Tag", "Entity Name", "Size"]
     for col in required_cols:
         if col not in df.columns:
@@ -170,22 +173,21 @@ def main():
     # 1. Connessione fra Corridoi:
     #    Si collegano due nodi di tipo Corridoio se:
     #      - La distanza euclidea è ≤ max_distance
-    #      - E almeno uno dei due rispetta la condizione direzionale rispetto all'altro.
+    #      - E almeno uno dei due rispetta la condizione direzionale rispetto all'altro
+    #        (ossia, viene usato il vincolo "Size" del corridoio).
     corridor_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Corridoio"]
     for i, j in itertools.combinations(corridor_nodes, 2):
         pos_i = (G.nodes[i]["x"], G.nodes[i]["y"])
         pos_j = (G.nodes[j]["x"], G.nodes[j]["y"])
         dist = math.dist(pos_i, pos_j)
         if dist <= max_distance:
-            # Aggiungiamo l'arco se:
-            # - j si trova nella direzione indicata da i oppure
-            # - i si trova nella direzione indicata da j.
             if is_valid_direction(pos_i, pos_j, G.nodes[i]["size"]) or is_valid_direction(pos_j, pos_i, G.nodes[j]["size"]):
                 G.add_edge(i, j, weight=dist)
     
     # 2. Connessione Macchina -> Corridoio:
-    #    Per ogni Macchina, si collega una sola volta al Corridoio più vicino che rispetti la condizione
-    #    direzionale del corridoio (ossia: la macchina deve trovarsi nella direzione indicata dal corridoio).
+    #    Per ogni Macchina, si collega una sola volta al Corridoio più vicino che rispetti
+    #    la condizione direzionale indicata dal Corridoio (il vincolo "Size" viene applicato
+    #    solo al Corridoio, non alla Macchina).
     machine_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Macchina"]
     for machine in machine_nodes:
         machine_pos = (G.nodes[machine]["x"], G.nodes[machine]["y"])
@@ -194,8 +196,6 @@ def main():
         for corridor in corridor_nodes:
             corridor_pos = (G.nodes[corridor]["x"], G.nodes[corridor]["y"])
             dist = math.dist(machine_pos, corridor_pos)
-            # Consideriamo il corridoio solo se la distanza è ≤ max_distance
-            # e se la macchina rispetta la direzione indicata dal corridoio.
             if dist < best_dist and dist <= max_distance and is_valid_direction(machine_pos, corridor_pos, G.nodes[corridor]["size"]):
                 best_dist = dist
                 best_corridor = corridor
@@ -218,22 +218,19 @@ def main():
     # 5. Calcolo dei percorsi per tutte le coppie di macchine
     st.subheader("Calcolo dei percorsi per tutte le coppie di macchine")
     results = []
-    # Ordiniamo i nodi Macchina (per entity_name ad es.)
     machine_nodes_sorted = sorted([n for n, d in G.nodes(data=True) if d["tag"] == "Macchina"],
                                   key=lambda n: G.nodes[n]["entity_name"])
     
     for source, target in itertools.combinations(machine_nodes_sorted, 2):
         source_name = G.nodes[source]["entity_name"]
         target_name = G.nodes[target]["entity_name"]
-        
-        # Definiamo il collegamento (es. "M1 --> M2")
         collegamento = f"{source_name} --> {target_name}"
         
-        # Per imporre il vincolo, se il nodo di partenza è una Macchina 
-        # cerchiamo il corridoio più vicino tra i suoi vicini
+        # Per imporre il vincolo, se il nodo di partenza è una Macchina
+        # cerchiamo il Corridoio più vicino tra i suoi vicini.
         corridor_neighbors = [n for n in G.neighbors(source) if G.nodes[n]["tag"] == "Corridoio"]
         
-        # --- Percorso Ottimale (Dijkstra) con vincolo del primo corridoio ---
+        # --- Percorso Ottimale (Dijkstra) con vincolo del primo Corridoio ---
         if corridor_neighbors:
             nearest_corridor = min(corridor_neighbors, key=lambda n: math.dist(pos[source], pos[n]))
             if nx.has_path(G, nearest_corridor, target):
@@ -252,7 +249,7 @@ def main():
             dettaglio_ottimale = ""
             length_euclid = None
         
-        # --- Percorso Greedy con vincolo del primo corridoio ---
+        # --- Percorso Greedy con vincolo del primo Corridoio ---
         if corridor_neighbors:
             nearest_corridor = min(corridor_neighbors, key=lambda n: math.dist(pos[source], pos[n]))
             sub_path = greedy_path(G, nearest_corridor, target, pos)
@@ -292,7 +289,7 @@ def main():
     with pd.ExcelWriter(towrite, engine='xlsxwriter') as writer:
         df_results.to_excel(writer, index=False, sheet_name='Risultati')
     towrite.seek(0)
-
+    
     st.download_button(
         label="Scarica file Excel",
         data=towrite,
@@ -302,3 +299,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
