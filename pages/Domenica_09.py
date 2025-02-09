@@ -197,10 +197,9 @@ def main():
     
     G=Creazione_G('STD',df_all,max_distance) 
     G_filter=Creazione_G('filter',df_all,max_distance)
-
     if scelta=="Ottimale":  G_graph= G
     elif scelta=="Corridoi vincolati": G_graph= G_filter
-    try:
+
     st.write("Colonna con percorsi senza vincoli")
     st.write("Numero totale di nodi:", G_graph.number_of_nodes())
     st.write("Numero totale di archi:", G_graph.number_of_edges())
