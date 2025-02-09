@@ -100,7 +100,7 @@ def Creazione_G(tipologia_grafo,df_all,max_distance):
                        size=row["Size"],
                        stream=row["URL"])
         # 1. Connessione fra Corridoi:
-        corridor_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Corridoio"]   permutations
+        corridor_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Corridoio"] 
         for i, j in itertools.permutations(corridor_nodes, 2):
         #for i, j in itertools.combinations(corridor_nodes, 2):
             entity_i=G.nodes[i]["entity_name"]
