@@ -41,13 +41,13 @@ def is_valid_direction_filter(current_pos, candidate_pos, direction,stream):
         direction = str(direction)
         
     if direction == "verticale":
-        if dist_y>dist_x: x=True  
+        if dist_y>dist_x: x=False  
         else: x=False
     elif direction == "orizzontale":
         if dist_y<dist_x:   x=False  
         else: x=False
     else: x=True  
-    st.write(f"Condition met? {x}")  # Debugging
+      # Debugging
     return x
 
 def breakdown_path(path, pos):
