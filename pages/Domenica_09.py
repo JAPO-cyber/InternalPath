@@ -28,58 +28,7 @@ def is_valid_direction(current_pos, candidate_pos, direction):
         else:
             return False
     return True
-def greedy_path(G, source, target, pos):
-    """
-    Algoritmo greedy che, partendo da 'source', seleziona ad ogni passo il nodo adiacente
-    che rispetta i seguenti vincoli:
-      - Se il candidato non è il target, deve essere di tipo "Corridoio".
-      - Se il nodo corrente è di tipo "Corridoio", viene applicato il vincolo direzionale 
-        (basato su Size). Se il nodo corrente è di tipo Macchina, il vincolo non viene applicato.
-      - Al primo salto, se il nodo di partenza è una Macchina, si forza il collegamento 
-        con un Corridoio (scartando quindi altri eventuali nodi Macchina).
-    Restituisce la lista di nodi che compongono il percorso oppure None se non ne trova uno.
-    """
-    path = [source]
-    visited = set(path)
-    current = source
-
-    while current != target:
-        candidates = []
-        for neigh in G.neighbors(current):
-            if neigh in visited:
-                continue
-
-            # Al primo salto: se il nodo corrente è una Macchina, non consideriamo altri nodi Macchina
-            if len(path) == 1 and G.nodes[current]["tag"] == "Macchina" and G.nodes[neigh]["tag"] == "Macchina":
-                continue
-
-            # Se il candidato non è il target, deve essere un Corridoio
-            if neigh != target and G.nodes[neigh]["tag"] == "Macchina":
-                continue
-
-            # Applica il controllo direzionale SOLO se il nodo corrente è un Corridoio.
-            if G.nodes[current]["tag"] == "Corridoio":
-                direction = G.nodes[current]["size"]
-                if not is_valid_direction(pos[current], pos[neigh], direction):
-                    continue
-
-            candidates.append(neigh)
-
-        if not candidates:
-            return None  # Nessun candidato valido trovato
-
-        # Selezioniamo il candidato più vicino (in distanza euclidea) rispetto al nodo corrente
-        next_node = min(candidates, key=lambda n: math.dist(pos[current], pos[n]))
-        path.append(next_node)
-        visited.add(next_node)
-        current = next_node
-
-        # Sicurezza per evitare cicli infiniti
-        if len(path) > len(G.nodes()):
-            return None
-
-    return path
-
+    
 def breakdown_path(path, pos):
     """
     Data una lista di nodi (path) e il dizionario pos,
@@ -108,6 +57,41 @@ def display_graph(G, pos, corridors, machines):
     ax.legend()
     ax.axis("off")
     st.pyplot(fig)
+
+def Creazione_G(tipologia_grafo,df_all):
+        G = nx.Graph()
+        for idx, row in df_all.iterrows():
+        G.add_node(idx, 
+                   x=row["X"], 
+                   y=row["Y"], 
+                   tag=row["Tag"], 
+                   entity_name=row["Entity Name"], 
+                   size=row["Size"])
+        # 1. Connessione fra Corridoi:
+        corridor_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Corridoio"]
+        for i, j in itertools.combinations(corridor_nodes, 2):
+            pos_i = (G.nodes[i]["x"], G.nodes[i]["y"])
+            pos_j = (G.nodes[j]["x"], G.nodes[j]["y"])
+            dist = abs(pos_j[0] - pos_i[0]) + abs(pos_j[1] - pos_i[1])
+            if dist <= max_distance:
+            if is_valid_direction(pos_i, pos_j, G.nodes[i]["size"]):
+                G.add_edge(i, j, weight=dist)
+         #2. Connessione Macchina -> Corridoio:
+         machine_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Macchina"]
+        for machine in machine_nodes:
+            machine_pos = (G.nodes[machine]["x"], G.nodes[machine]["y"])
+            best_corridor = None
+            best_dist = float('inf')
+            for corridor in corridor_nodes:
+                corridor_pos = (G.nodes[corridor]["x"], G.nodes[corridor]["y"])
+                dist = math.dist(machine_pos, corridor_pos)
+                # Si considera solo la distanza, senza il controllo del vincolo direzionale.
+                if dist < best_dist and dist <= max_distance:
+                    best_dist = dist
+                    best_corridor = corridor
+            if best_corridor is not None:
+                G.add_edge(machine, best_corridor, weight=best_dist)
+        return G
 
 def main():
     st.title("Collegamento Macchine Tramite Corridoi – Calcolo di tutte le coppie")
@@ -161,60 +145,15 @@ def main():
     max_distance = st.slider("Distanza massima per collegare i nodi", 
                                min_value=0.0, max_value=10.0, value=5.0,
                                help="Due nodi vengono collegati se la distanza euclidea è ≤ a questo valore.")
+
     
-    G = nx.Graph()
-    for idx, row in df_all.iterrows():
-        G.add_node(idx, 
-                   x=row["X"], 
-                   y=row["Y"], 
-                   tag=row["Tag"], 
-                   entity_name=row["Entity Name"], 
-                   size=row["Size"])
-    
-    # 1. Connessione fra Corridoi:
-#    Si collegano due nodi di tipo Corridoio se:
-#      - La distanza euclidea è ≤ max_distance
-#      - E solo se il punto di partenza (il primo nodo della coppia) rispetta la condizione direzionale
-#        in base al proprio vincolo "Size".
-    corridor_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Corridoio"]
-    for i, j in itertools.combinations(corridor_nodes, 2):
-        pos_i = (G.nodes[i]["x"], G.nodes[i]["y"])
-        pos_j = (G.nodes[j]["x"], G.nodes[j]["y"])
-        
-        # Escludi collegamenti se i due punti non sono allineati in una sola dimensione:
-        # Se entrambi gli assi variano, significa che il collegamento sarebbe in diagonale.
-        # Calcola la distanza "Manhattan" (in questo caso coincide con la distanza euclidea
-        # se la variazione è solo lungo un asse)
-        dist = abs(pos_j[0] - pos_i[0]) + abs(pos_j[1] - pos_i[1])
-        # Distanza euclidea
-        #dist = math.dist(pos_i, pos_j)
-        if dist <= max_distance:
-            if is_valid_direction(pos_i, pos_j, G.nodes[i]["size"]):
-                G.add_edge(i, j, weight=dist)
-            
-    # 2. Connessione Macchina -> Corridoio:
-    #    Per ogni Macchina, si collega una sola volta al Corridoio più vicino che rispetti
-    #    la condizione direzionale indicata dal Corridoio (il vincolo "Size" viene applicato
-    #    solo al Corridoio, non alla Macchina).
-    machine_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Macchina"]
-    for machine in machine_nodes:
-        machine_pos = (G.nodes[machine]["x"], G.nodes[machine]["y"])
-        best_corridor = None
-        best_dist = float('inf')
-        for corridor in corridor_nodes:
-            corridor_pos = (G.nodes[corridor]["x"], G.nodes[corridor]["y"])
-            dist = math.dist(machine_pos, corridor_pos)
-            # Si considera solo la distanza, senza il controllo del vincolo direzionale.
-            if dist < best_dist and dist <= max_distance:
-                best_dist = dist
-                best_corridor = corridor
-        if best_corridor is not None:
-            G.add_edge(machine, best_corridor, weight=best_dist)
-    # --------------------------
+
+
+    G=Creazione_G("STD",df_all)  
     
     st.write("Numero totale di nodi:", G.number_of_nodes())
     st.write("Numero totale di archi:", G.number_of_edges())
-    
+
     # Preparo la posizione dei nodi per la visualizzazione
     pos = {node: (data["x"], data["y"]) for node, data in G.nodes(data=True)}
     corridors = [n for n, d in G.nodes(data=True) if d["tag"] == "Corridoio"]
@@ -241,6 +180,8 @@ def main():
     # Visualizziamo il DataFrame in forma tabellare e permettiamo la modifica interattiva
     st.subheader("Tabella delle Connessioni fra Corridoi")
     edited_edges = st.data_editor(df_corridor_edges, num_rows="dynamic", key="corridor_edges_editor")
+
+    # Visualizza
     
     # 5. Calcolo dei percorsi per tutte le coppie di macchine
     st.subheader("Calcolo dei percorsi per tutte le coppie di macchine")
