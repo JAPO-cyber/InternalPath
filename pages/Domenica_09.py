@@ -62,7 +62,7 @@ def is_valid_direction_filter(entity_i,entity_j,current_pos, candidate_pos, dire
             if y2 > y1: x=False 
         elif stream == "basso":
             if y2 < y1: x=False 
-        else x=True
+        else: x=True
     st.write(f"L'output della funzione è {x}")
 
     
