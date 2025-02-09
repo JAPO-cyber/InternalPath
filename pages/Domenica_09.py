@@ -102,7 +102,7 @@ def Creazione_G(tipologia_grafo,df_all,max_distance):
                 if tipologia_grafo=="STD":
                     if is_valid_direction(pos_i, pos_j, G.nodes[i]["size"]):
                         G.add_edge(i, j, weight=dist)
-                else
+                else:
                     if is_valid_direction_filter(pos_i, pos_j, G.nodes[i]["size"], G.nodes[i]["stream"]):
                         G.add_edge(i, j, weight=dist)
         # 2. Connessione Macchina -> Corridoio:
