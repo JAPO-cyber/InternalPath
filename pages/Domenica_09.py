@@ -16,6 +16,8 @@ def is_valid_direction(current_pos, candidate_pos, direction):
     x2, y2 = candidate_pos
     dist_x = abs(x1 - x2)
     dist_y = abs(y1 - y2)
+    direction = direction.split('_')[0]
+    direction_path=direction.split('_')[1]
 
     if direction == "verticale":
         if dist_y>dist_x: 
@@ -241,10 +243,6 @@ def main():
     # Visualizziamo il DataFrame in forma tabellare e permettiamo la modifica interattiva
     st.subheader("Tabella delle Connessioni fra Corridoi")
     edited_edges = st.data_editor(df_corridor_edges, num_rows="dynamic", key="corridor_edges_editor")
-    
-    # Se desideri anche visualizzare la tabella modificata
-    st.write("Tabella modificata:")
-    st.dataframe(edited_edges)
     
     # 5. Calcolo dei percorsi per tutte le coppie di macchine
     st.subheader("Calcolo dei percorsi per tutte le coppie di macchine")
