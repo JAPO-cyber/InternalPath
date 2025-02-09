@@ -42,8 +42,8 @@ def is_valid_direction_filter(current_pos, candidate_pos, direction,stream):
     
     if direction == "verticale":
         if dist_y>dist_x: 
-            if stream=="alto" and y2>y1: return True
-            elif stream=="basso" and y2<y1: return True
+            if stream=="alto" and y2-y1>0: return True
+            elif stream=="basso" and y2-y1<0: return True
             else: return False    
         else:
             return False
