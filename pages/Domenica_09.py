@@ -35,7 +35,6 @@ def is_valid_direction_filter(entity_i,entity_j,current_pos, candidate_pos, dire
     x2, y2 = candidate_pos
     dist_x = abs(x1 - x2)
     dist_y = abs(y1 - y2)
-    st.write(f"Current: {entity_i}, Candidate: {entity_j}")
     x = False
     
     if not isinstance(direction, str):
@@ -54,7 +53,7 @@ def is_valid_direction_filter(entity_i,entity_j,current_pos, candidate_pos, dire
     elif stream == "basso":
         if y2 < y1: x=False 
     else: x=True
-    st.write(f"L'output della funzione è {x}")
+    st.write(f"Current: {entity_i}, Candidate: {entity_j},stream:{stream},L'output della funzione è {x}")
 
     
     return x
