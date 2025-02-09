@@ -10,13 +10,12 @@ def is_valid_direction(current_pos, candidate_pos, direction):
     """
     Verifica se il candidato (x2, y2) rispetta la condizione direzionale
     rispetto al punto corrente (x1, y1) in base alla direzione fornita.
-    I valori validi per 'direction' sono "destro", "sinistro", "alto" e "basso".
     """
     x1, y1 = current_pos
     x2, y2 = candidate_pos
     dist_x = abs(x1 - x2)
     dist_y = abs(y1 - y2)
-    
+
     if direction == "verticale":
         if dist_y>dist_x: 
             return True    
@@ -30,18 +29,14 @@ def is_valid_direction(current_pos, candidate_pos, direction):
     return True
 
 def is_valid_direction_filter(current_pos, candidate_pos, direction,stream):
-    """
-    Verifica se il candidato (x2, y2) rispetta la condizione direzionale
-    rispetto al punto corrente (x1, y1) in base alla direzione fornita.
-    I valori validi per 'direction' sono "destro", "sinistro", "alto" e "basso".
-    """
+    
     x1, y1 = current_pos
     x2, y2 = candidate_pos
     dist_x = abs(x1 - x2)
     dist_y = abs(y1 - y2)
     
     if direction == "verticale":
-          if stream=="basso": return True
+          if stream=="basso": return False
           else: return False    
     elif direction == "orizzontale": return False 
     else: return False 
