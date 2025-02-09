@@ -40,7 +40,7 @@ def breakdown_path(path, pos):
         segments.append(f"{d:.2f}")
     return " + ".join(segments)
 
-def display_graph(G, pos, corridors, machines,max_distance):
+def display_graph(G, pos, corridors, machines):
     """
     Visualizza il grafo con:
       - Nodi "Corridoio" in skyblue
@@ -58,7 +58,7 @@ def display_graph(G, pos, corridors, machines,max_distance):
     ax.axis("off")
     st.pyplot(fig)
 
-def Creazione_G(tipologia_grafo,df_all):
+def Creazione_G(tipologia_grafo,df_all,max_distance):
         G = nx.Graph()
         for idx, row in df_all.iterrows():
             G.add_node(idx, 
