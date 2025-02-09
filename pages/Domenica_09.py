@@ -6,6 +6,11 @@ import itertools
 import matplotlib.pyplot as plt
 import io
 
+st.set_page_config(
+    page_title="Ottimizzazione Percorsi Interni",
+    layout="wide"  # Imposta il layout a schermo intero
+)
+
 def is_valid_direction(current_pos, candidate_pos, direction):
     """
     Verifica se il candidato (x2, y2) rispetta la condizione direzionale
