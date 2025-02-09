@@ -16,36 +16,18 @@ def is_valid_direction(current_pos, candidate_pos, direction):
     x2, y2 = candidate_pos
     dist_x = abs(x1 - x2)
     dist_y = abs(y1 - y2)
-        
-    if direction == "destro":
-        if x2 > x1 and dist_x>dist_y: 
-            return True
-        else:
-            return False
-    elif direction == "sinistro":
-        if x2 < x1 and dist_x>dist_y: 
-            return True
-        else:
-            return False
-    elif direction == "alto":
-        if y2 > y1 and dist_y>dist_x: 
-            return True
-        else:
-            return False
-    elif direction == "basso":
-        if y2 < y1 and dist_y>dist_x: 
-            return True    
-        else:
-            return False
 
-    elif direction == "verticale":
+    if direction == "verticale":
         if dist_y>dist_x: 
             return True    
         else:
             return False
-            
+    elif direction == "orizzontale":
+        if dist_y<dist_x: 
+            return True    
+        else:
+            return False
     return True
-
 def greedy_path(G, source, target, pos):
     """
     Algoritmo greedy che, partendo da 'source', seleziona ad ogni passo il nodo adiacente
