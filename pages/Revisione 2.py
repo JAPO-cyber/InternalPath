@@ -26,12 +26,12 @@ def is_valid_direction(current_pos, candidate_pos, direction):
 def greedy_path(G, source, target, pos):
     """
     Algoritmo greedy che, partendo da 'source', seleziona ad ogni passo il nodo adiacente
-    che rispetti i seguenti vincoli:
+    che rispetta i seguenti vincoli:
       - Se il candidato non è il target, deve essere di tipo "Corridoio".
       - Se il nodo corrente è di tipo "Corridoio", viene applicata la regola direzionale
         utilizzando il valore della sua colonna "Size" per filtrare i possibili nodi successivi.
-      - Se il nodo corrente è una "Macchina" (tipicamente il punto di partenza), non viene
-        applicato alcun filtro direzionale.
+      - Se il nodo corrente è una "Macchina" (tipicamente il punto di partenza), 
+        al primo salto non viene considerato un altro nodo Macchina (così da forzare il passaggio al corridoio più vicino).
     Restituisce la lista di nodi che compongono il percorso oppure None se non ne trova uno.
     """
     path = [source]
@@ -42,6 +42,11 @@ def greedy_path(G, source, target, pos):
         candidates = []
         for neigh in G.neighbors(current):
             if neigh in visited:
+                continue
+
+            # Se siamo al primo passo e il nodo corrente è una Macchina, 
+            # non possiamo scegliere come candidato un'altra Macchina (anche se fosse il target).
+            if len(path) == 1 and G.nodes[current]["tag"] == "Macchina" and G.nodes[neigh]["tag"] == "Macchina":
                 continue
 
             # Se il candidato non è il target, deve essere un "Corridoio"
@@ -189,27 +194,48 @@ def main():
         source_name = G.nodes[source]["entity_name"]
         target_name = G.nodes[target]["entity_name"]
         
-        # Collegamento macchina (es. "M1 --> M2")
+        # Definiamo il collegamento (es. "M1 --> M2")
         collegamento = f"{source_name} --> {target_name}"
         
-        # Percorso ottimale (Dijkstra)
-        if nx.has_path(G, source, target):
-            path_euclid = nx.shortest_path(G, source=source, target=target, weight="weight")
-            length_euclid = nx.shortest_path_length(G, source=source, target=target, weight="weight")
-            percorso_ottimale = " --> ".join(G.nodes[n]["entity_name"] for n in path_euclid)
-            dettaglio_ottimale = breakdown_path(path_euclid, pos)
+        # Per imporre il vincolo, se il nodo di partenza è una Macchina 
+        # cerchiamo il corridoio più vicino tra i suoi vicini
+        corridor_neighbors = [n for n in G.neighbors(source) if G.nodes[n]["tag"] == "Corridoio"]
+        
+        # --- Percorso Ottimale (Dijkstra) con vincolo del primo corridoio ---
+        if corridor_neighbors:
+            nearest_corridor = min(corridor_neighbors, key=lambda n: math.dist(pos[source], pos[n]))
+            if nx.has_path(G, nearest_corridor, target):
+                sub_path = nx.shortest_path(G, source=nearest_corridor, target=target, weight="weight")
+                length_sub = nx.shortest_path_length(G, source=nearest_corridor, target=target, weight="weight")
+                full_path = [source] + sub_path  # Forzo il passaggio: macchina -> corridoio -> ... -> target
+                length_euclid = math.dist(pos[source], pos[nearest_corridor]) + length_sub
+                percorso_ottimale = " --> ".join(G.nodes[n]["entity_name"] for n in full_path)
+                dettaglio_ottimale = breakdown_path(full_path, pos)
+            else:
+                percorso_ottimale = "Nessun percorso"
+                dettaglio_ottimale = ""
+                length_euclid = None
         else:
             percorso_ottimale = "Nessun percorso"
             dettaglio_ottimale = ""
             length_euclid = None
         
-        # Percorso greedy basato su Size
-        path_greedy = greedy_path(G, source, target, pos)
-        if path_greedy is not None:
-            length_greedy = sum(math.dist(pos[path_greedy[i]], pos[path_greedy[i+1]])
-                                for i in range(len(path_greedy)-1))
-            percorso_greedy = " --> ".join(G.nodes[n]["entity_name"] for n in path_greedy)
-            dettaglio_greedy = breakdown_path(path_greedy, pos)
+        # --- Percorso Greedy con vincolo del primo corridoio ---
+        if corridor_neighbors:
+            nearest_corridor = min(corridor_neighbors, key=lambda n: math.dist(pos[source], pos[n]))
+            sub_path = greedy_path(G, nearest_corridor, target, pos)
+            if sub_path is not None:
+                full_path = [source] + sub_path  # Forzo il passaggio: macchina -> corridoio -> ... -> target
+                length_greedy = math.dist(pos[source], pos[nearest_corridor]) + sum(
+                    math.dist(pos[full_path[i]], pos[full_path[i+1]])
+                    for i in range(len(full_path)-1)
+                )
+                percorso_greedy = " --> ".join(G.nodes[n]["entity_name"] for n in full_path)
+                dettaglio_greedy = breakdown_path(full_path, pos)
+            else:
+                percorso_greedy = "Nessun percorso"
+                dettaglio_greedy = ""
+                length_greedy = None
         else:
             percorso_greedy = "Nessun percorso"
             dettaglio_greedy = ""
@@ -230,11 +256,9 @@ def main():
     st.dataframe(df_results)
     
     # 6. Download del file Excel con i risultati
-    # Creazione del file Excel in memoria
     towrite = io.BytesIO()
     with pd.ExcelWriter(towrite, engine='xlsxwriter') as writer:
         df_results.to_excel(writer, index=False, sheet_name='Risultati')
-        # Non è necessario chiamare writer.save() qui!
     towrite.seek(0)
 
     st.download_button(
@@ -242,13 +266,7 @@ def main():
         data=towrite,
         file_name="risultati_percorsi.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
     )
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
