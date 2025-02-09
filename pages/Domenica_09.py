@@ -14,8 +14,8 @@ def is_valid_direction(current_pos, candidate_pos, direction):
     """
     x1, y1 = current_pos
     x2, y2 = candidate_pos
-    dist_x = abs(pos_j[0] - pos_i[0])
-    dist_y = abs(pos_j[1] - pos_i[1])
+    dist_x = abs(x1 - x2)
+    dist_y = abs(y1 - y2)
         
     if direction == "destro":
         if x2 > x1 and dist_x>dist_y: 
