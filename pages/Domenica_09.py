@@ -52,7 +52,7 @@ def is_valid_direction_filter(current_pos, candidate_pos, direction,stream):
         if dist_y<dist_x:   x=False  
         else: x=False
     else: x=True  
-     
+    st.write(f"L'output della funzione è {x}")
     return x
 
 def breakdown_path(path, pos):
