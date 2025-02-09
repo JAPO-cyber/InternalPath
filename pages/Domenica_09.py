@@ -122,9 +122,9 @@ def main():
     
     # 2. Anteprima e modifica del DataFrame (solo le colonne "Entity Name" e "Size")
     st.subheader("Anteprima e modifica dei dati (solo 'Entity Name' e 'Size')")
-    # Visualizziamo e permettiamo la modifica soltanto di queste due colonne
-    edited_data = st.experimental_data_editor(df[['Entity Name', 'Size']], num_rows="dynamic")
-    # Aggiorniamo il DataFrame originale con le modifiche effettuate
+    # Usando la funzione st.data_editor (la versione stabile aggiornata)
+    edited_data = st.data_editor(df[['Entity Name', 'Size']], num_rows="dynamic")
+    # Aggiorniamo il DataFrame originale con le modifiche
     df.update(edited_data)
     
     # Verifica delle colonne necessarie
@@ -299,4 +299,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
