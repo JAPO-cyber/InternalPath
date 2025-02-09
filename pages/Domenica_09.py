@@ -178,7 +178,7 @@ def main():
         pos_j = (G.nodes[j]["x"], G.nodes[j]["y"])
         dist = math.dist(pos_i, pos_j)
         if dist <= max_distance:
-            if is_valid_direction(pos_i, pos_j, G.nodes[j]["size"]):
+            if is_valid_direction(pos_i, pos_j, G.nodes[j]["Size"]):
                 G.add_edge(i, j, weight=dist)
             
     # 2. Connessione Macchina -> Corridoio:
