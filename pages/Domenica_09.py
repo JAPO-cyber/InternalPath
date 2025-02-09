@@ -146,9 +146,9 @@ def main():
         df = pd.read_excel(uploaded_file)
     
     # 2. Anteprima e modifica del DataFrame (solo le colonne "Entity Name" e "Size")
-    st.subheader("Anteprima e modifica dei dati (solo 'Entity Name' e 'Size')")
+    st.subheader("Anteprima e modifica dei dati")
     # Usando la funzione st.data_editor (la versione stabile aggiornata)
-    edited_data = st.data_editor(df[['Entity Name', 'Size']], num_rows="dynamic")
+    edited_data = st.data_editor(df[['Entity Name', 'Size','URL']], num_rows="dynamic")
     # Aggiorniamo il DataFrame originale con le modifiche
     df.update(edited_data)
     
