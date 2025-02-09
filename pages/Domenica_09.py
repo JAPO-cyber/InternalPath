@@ -39,7 +39,7 @@ def is_valid_direction(current_pos, candidate_pos, direction):
             return False
 
     elif direction == "verticale":
-        if dist_y<dist_x: 
+        if dist_y>dist_x: 
             return True    
         else:
             return False
