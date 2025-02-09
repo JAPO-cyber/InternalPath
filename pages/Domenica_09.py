@@ -176,7 +176,16 @@ def main():
     for i, j in itertools.combinations(corridor_nodes, 2):
         pos_i = (G.nodes[i]["x"], G.nodes[i]["y"])
         pos_j = (G.nodes[j]["x"], G.nodes[j]["y"])
-        dist = math.dist(pos_i, pos_j)
+        
+        # Escludi collegamenti se i due punti non sono allineati in una sola dimensione:
+        # Se entrambi gli assi variano, significa che il collegamento sarebbe in diagonale.
+        if pos_i[0] != pos_j[0] and pos_i[1] != pos_j[1]:
+            continue
+        # Calcola la distanza "Manhattan" (in questo caso coincide con la distanza euclidea
+        # se la variazione è solo lungo un asse)
+        dist = abs(pos_j[0] - pos_i[0]) + abs(pos_j[1] - pos_i[1])
+        # Distanza euclidea
+        # dist = math.dist(pos_i, pos_j)
         if dist <= max_distance:
             if is_valid_direction(pos_i, pos_j, G.nodes[j]["size"]):
                 G.add_edge(i, j, weight=dist)
