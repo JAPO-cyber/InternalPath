@@ -33,12 +33,12 @@ def is_valid_direction_filter(current_pos, candidate_pos, direction,stream):
     x2, y2 = candidate_pos
     dist_x = abs(x1 - x2)
     dist_y = abs(y1 - y2)
-    print(f"Current: {current_pos}, Candidate: {candidate_pos}")
-    print(f"dist_x: {dist_x}, dist_y: {dist_y}, direction: {direction}")
+    st.write(f"Current: {current_pos}, Candidate: {candidate_pos}")
+    st.write(f"dist_x: {dist_x}, dist_y: {dist_y}, direction: {direction}")
     x = False
-    if direction == "verticale":
+    if direction.strip().lower()  == "verticale":
         x = dist_y > dist_x
-        print(f"Condition met? {x}")  # Debugging
+        st.write(f"Condition met? {x}")  # Debugging
     return x
 
 def breakdown_path(path, pos):
