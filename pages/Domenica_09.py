@@ -100,8 +100,9 @@ def Creazione_G(tipologia_grafo,df_all,max_distance):
                        size=row["Size"],
                        stream=row["URL"])
         # 1. Connessione fra Corridoi:
-        corridor_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Corridoio"]
-        for i, j in itertools.combinations(corridor_nodes, 2):
+        corridor_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Corridoio"]   permutations
+        for i, j in itertools.permutations(corridor_nodes, 2):
+        #for i, j in itertools.combinations(corridor_nodes, 2):
             entity_i=G.nodes[i]["entity_name"]
             entity_j=G.nodes[j]["entity_name"]
             pos_i = (G.nodes[i]["x"], G.nodes[i]["y"])
@@ -228,6 +229,8 @@ def main():
     results = []
     machine_nodes_sorted = sorted([n for n, d in G.nodes(data=True) if d["tag"] == "Macchina"],
                                   key=lambda n: G.nodes[n]["entity_name"])
+
+    # Permutazione o combinazione?
     for source, target in itertools.permutations(machine_nodes_sorted, 2):
     #for source, target in itertools.combinations(machine_nodes_sorted, 2):
         source_name = G.nodes[source]["entity_name"]
