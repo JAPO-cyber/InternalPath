@@ -19,9 +19,9 @@ def is_valid_direction(current_pos, candidate_pos, direction):
     elif direction == "sinistro":
         return x2 < x1
     elif direction == "alto":
-        return y2 > y1
-    elif direction == "basso":
         return y2 < y1
+    elif direction == "basso":
+        return y2 > y1
     return False
 
 def greedy_path(G, source, target, pos):
