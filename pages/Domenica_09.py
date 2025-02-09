@@ -28,13 +28,12 @@ def is_valid_direction(current_pos, candidate_pos, direction):
             return False
     return True
 
-def is_valid_direction_filter(current_pos, candidate_pos, direction,stream):
+def is_valid_direction_filter(entity_i,entity_j,current_pos, candidate_pos, direction,stream):
     x1, y1 = current_pos
     x2, y2 = candidate_pos
     dist_x = abs(x1 - x2)
     dist_y = abs(y1 - y2)
-    st.write(f"Current: {current_pos}, Candidate: {candidate_pos}")
-    st.write(f"dist_x: {dist_x}, dist_y: {dist_y}, direction: {direction}")
+    st.write(f"Current: {entity_i}, Candidate: {entity_j}")
     x = False
     
     if not isinstance(direction, str):
@@ -97,6 +96,8 @@ def Creazione_G(tipologia_grafo,df_all,max_distance):
         # 1. Connessione fra Corridoi:
         corridor_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Corridoio"]
         for i, j in itertools.combinations(corridor_nodes, 2):
+            entity_i=G.nodes[i]["Entity Name"]
+            entity_j=G.nodes[j]["Entity Name"]
             pos_i = (G.nodes[i]["x"], G.nodes[i]["y"])
             pos_j = (G.nodes[j]["x"], G.nodes[j]["y"])
             dist = abs(pos_j[0] - pos_i[0]) + abs(pos_j[1] - pos_i[1])
@@ -105,7 +106,7 @@ def Creazione_G(tipologia_grafo,df_all,max_distance):
                     if is_valid_direction(pos_i, pos_j, G.nodes[i]["size"]):
                         G.add_edge(i, j, weight=dist)
                 else:
-                    if is_valid_direction_filter(pos_i, pos_j, G.nodes[i]["size"], G.nodes[i]["stream"]):
+                    if is_valid_direction_filter(entity_i, entity_j,pos_i, pos_j, G.nodes[i]["size"], G.nodes[i]["stream"]):
                         G.add_edge(i, j, weight=dist)
         # 2. Connessione Macchina -> Corridoio:
         machine_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Macchina"]
