@@ -283,17 +283,17 @@ def main():
                 sub_path = nx.shortest_path(G, source=nearest_corridor, target=target, weight="weight")
                 length_sub = nx.shortest_path_length(G, source=nearest_corridor, target=target, weight="weight")
                 full_path = [source] + sub_path  # Forzo il passaggio: Macchina -> Corridoio -> ... -> Target
-                length_euclid = math.dist(pos[source], pos[nearest_corridor]) + length_sub
-                percorso_ottimale = " --> ".join(G.nodes[n]["entity_name"] for n in full_path)
-                dettaglio_ottimale = breakdown_path(full_path, pos)
+                length_greedy = math.dist(pos[source], pos[nearest_corridor]) + length_sub
+                percorso_greedy = " --> ".join(G.nodes[n]["entity_name"] for n in full_path)
+                dettaglio_greedy = breakdown_path(full_path, pos)
             else:
-                percorso_ottimale = "Nessun percorso"
-                dettaglio_ottimale = ""
-                length_euclid = None
+                percorso_greedy = "Nessun percorso"
+                dettaglio_greedy = ""
+                length_greedy = None
         else:
-            percorso_ottimale = "Nessun percorso"
-            dettaglio_ottimale = ""
-            length_euclid = None
+            percorso_greedy = "Nessun percorso"
+            dettaglio_greedy = ""
+            length_greedy = None
 
         
         results.append({
