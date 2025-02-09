@@ -39,10 +39,13 @@ def is_valid_direction_filter(entity_i,entity_j,current_pos, candidate_pos, dire
     if not isinstance(direction, str):
         direction = str(direction)
         
+    if not isinstance(stream, str):
+        stream = str(stream)
+        
     if direction == "verticale":
         
         if dist_y>dist_x: 
-            x=False  
+            x=True 
             st.write(f"Sono nell'IF verticale condizione 1")
         else: 
             x=False 
@@ -50,8 +53,19 @@ def is_valid_direction_filter(entity_i,entity_j,current_pos, candidate_pos, dire
     elif direction == "orizzontale":
         if dist_y<dist_x:   x=False  
         else: x=False
-    else: x=True  
+    else: 
+        if stream == "destro":
+            if x2 > x1: x=False 
+        elif stream == "sinistro":
+            if x2 < x1: x=False 
+        elif stream == "alto":
+            if y2 > y1: x=False 
+        elif stream == "basso":
+            if y2 < y1: x=False 
+        else x=True
     st.write(f"L'output della funzione è {x}")
+
+    
     return x
 
 def breakdown_path(path, pos):
