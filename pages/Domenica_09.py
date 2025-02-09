@@ -37,7 +37,7 @@ def is_valid_direction_filter(current_pos, candidate_pos, direction,stream):
     
     if direction == "verticale":
           if stream=="basso": return False
-          else: return False    
+          else: return True    
     elif direction == "orizzontale": return False 
     else: return False 
 def breakdown_path(path, pos):
