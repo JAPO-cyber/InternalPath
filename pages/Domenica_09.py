@@ -51,7 +51,7 @@ def is_valid_direction_filter(current_pos, candidate_pos, direction,stream):
                 return y2>y1
             elif stream=="basso":
                 return y1>y2
-            else True    
+            else: True    
         else:
             return False
     elif direction == "orizzontale":
