@@ -74,8 +74,8 @@ def Creazione_G(tipologia_grafo,df_all):
             pos_j = (G.nodes[j]["x"], G.nodes[j]["y"])
             dist = abs(pos_j[0] - pos_i[0]) + abs(pos_j[1] - pos_i[1])
             if dist <= max_distance:
-            if is_valid_direction(pos_i, pos_j, G.nodes[i]["size"]):
-                G.add_edge(i, j, weight=dist)
+                if is_valid_direction(pos_i, pos_j, G.nodes[i]["size"]):
+                    G.add_edge(i, j, weight=dist)
          #2. Connessione Macchina -> Corridoio:
          machine_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Macchina"]
          for machine in machine_nodes:
@@ -89,8 +89,8 @@ def Creazione_G(tipologia_grafo,df_all):
                 if dist < best_dist and dist <= max_distance:
                     best_dist = dist
                     best_corridor = corridor
-            if best_corridor is not None:
-                G.add_edge(machine, best_corridor, weight=best_dist)
+                    if best_corridor is not None:
+                        G.add_edge(machine, best_corridor, weight=best_dist)
         return G
 
 def main():
