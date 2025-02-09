@@ -25,7 +25,7 @@ def is_valid_direction(current_pos, candidate_pos, direction):
         else: 
             x=False 
     elif direction == "orizzontale":
-        if dist_y<dist_x:   x=False  
+        if dist_y<dist_x:   x=True  
         else: x=False
     else: x=True
     return x
@@ -50,6 +50,10 @@ def is_valid_direction_filter(entity_i,entity_j,current_pos, candidate_pos, dire
         if y2 > y1: x=True  
     elif stream == "basso":
         if y2 < y1: x=True
+    elif stream == "orizzontale": 
+        if dist_y<dist_x:   x=True
+    elif direction == "verticale":      
+        if dist_y>dist_x:   x=True 
     else: x=True
     st.write(f"Current: {entity_i}, Candidate: {entity_j},stream:{stream},L'output della funzione è {x}")
 
