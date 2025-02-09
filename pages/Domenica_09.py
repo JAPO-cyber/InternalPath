@@ -20,22 +20,22 @@ def is_valid_direction(current_pos, candidate_pos, direction):
     if direction == "destro":
         if x2 > x1 and dist_x>dist_y: 
             return True
-        else
+        else:
             return False
     elif direction == "sinistro":
         if x2 < x1 and dist_x>dist_y: 
             return True
-        else
+        else:
             return False
     elif direction == "alto":
         if y2 > y1 and dist_y>dist_x: 
             return True
-        else
+        else:
             return False
     elif direction == "basso":
         if y2 < y1 and dist_y>dist_x: 
             return True    
-        else
+        else:
             return False
     return True
 
