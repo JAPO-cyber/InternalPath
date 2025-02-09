@@ -14,14 +14,29 @@ def is_valid_direction(current_pos, candidate_pos, direction):
     """
     x1, y1 = current_pos
     x2, y2 = candidate_pos
+    dist_x = abs(pos_j[0] - pos_i[0])
+    dist_y = abs(pos_j[1] - pos_i[1])
+        
     if direction == "destro":
-        return x2 < x1
+        if x2 > x1 and dist_x>dist_y: 
+            return True
+        else
+            return False
     elif direction == "sinistro":
-        return x2 > x1
+        if x2 < x1 and dist_x>dist_y: 
+            return True
+        else
+            return False
     elif direction == "alto":
-        return y2 < y1
+        if y2 > y1 and dist_y>dist_x: 
+            return True
+        else
+            return False
     elif direction == "basso":
-        return y2 > y1
+        if y2 < y1 and dist_y>dist_x: 
+            return True    
+        else
+            return False
     return True
 
 def greedy_path(G, source, target, pos):
@@ -185,7 +200,7 @@ def main():
         # Distanza euclidea
         #dist = math.dist(pos_i, pos_j)
         if dist <= max_distance:
-            if is_valid_direction(pos_i, pos_j, G.nodes[j]["size"]):
+            if is_valid_direction(pos_i, pos_j, G.nodes[i]["size"]):
                 G.add_edge(i, j, weight=dist)
             
     # 2. Connessione Macchina -> Corridoio:
