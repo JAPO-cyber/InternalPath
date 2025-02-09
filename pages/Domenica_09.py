@@ -228,8 +228,8 @@ def main():
     results = []
     machine_nodes_sorted = sorted([n for n, d in G.nodes(data=True) if d["tag"] == "Macchina"],
                                   key=lambda n: G.nodes[n]["entity_name"])
-    
-    for source, target in itertools.combinations(machine_nodes_sorted, 2):
+    for source, target in itertools.permutations(machine_nodes_sorted, 2):
+    #for source, target in itertools.combinations(machine_nodes_sorted, 2):
         source_name = G.nodes[source]["entity_name"]
         target_name = G.nodes[target]["entity_name"]
         collegamento = f"{source_name} --> {target_name}"
@@ -282,9 +282,9 @@ def main():
             "Percorso Ottimale Seguito": percorso_ottimale,
             "Dettaglio Distanze Ottimale": dettaglio_ottimale,
             "Lunghezza Totale Ottimale": length_euclid,
-            "Percorso Greedy Seguito": percorso_greedy,
-            "Dettaglio Distanze Greedy": dettaglio_greedy,
-            "Lunghezza Totale Greedy": length_greedy,
+            "Percorso Vincolato Seguito": percorso_greedy,
+            "Dettaglio Distanze Vincolato": dettaglio_greedy,
+            "Lunghezza Totale Vincolato": length_greedy,
         })
     
     df_results = pd.DataFrame(results)
