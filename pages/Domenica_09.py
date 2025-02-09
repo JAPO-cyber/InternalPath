@@ -61,12 +61,12 @@ def display_graph(G, pos, corridors, machines):
 def Creazione_G(tipologia_grafo,df_all):
         G = nx.Graph()
         for idx, row in df_all.iterrows():
-        G.add_node(idx, 
-                   x=row["X"], 
-                   y=row["Y"], 
-                   tag=row["Tag"], 
-                   entity_name=row["Entity Name"], 
-                   size=row["Size"])
+            G.add_node(idx, 
+                       x=row["X"], 
+                       y=row["Y"], 
+                       tag=row["Tag"], 
+                       entity_name=row["Entity Name"], 
+                       size=row["Size"])
         # 1. Connessione fra Corridoi:
         corridor_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Corridoio"]
         for i, j in itertools.combinations(corridor_nodes, 2):
