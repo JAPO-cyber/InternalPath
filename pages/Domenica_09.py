@@ -149,7 +149,7 @@ def main():
     
 
 
-    G=Creazione_G("STD",df_all)  
+    G=Creazione_G('STD',df_all)  
     
     st.write("Numero totale di nodi:", G.number_of_nodes())
     st.write("Numero totale di archi:", G.number_of_edges())
