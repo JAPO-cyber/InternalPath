@@ -45,7 +45,7 @@ def is_valid_direction_filter(current_pos, candidate_pos, direction,stream):
             if stream=="alto":
                 return y2>y1
             elif stream=="basso":
-                return y1>y2
+                return y2<y1
             else: True    
         else:
             return False
@@ -54,7 +54,7 @@ def is_valid_direction_filter(current_pos, candidate_pos, direction,stream):
             if stream=="destro":
                 return x2>x1
             elif stream=="sinistro":
-                return x1>x2
+                return x2<x1
             else: True    
         else:
             return False
