@@ -28,7 +28,31 @@ def is_valid_direction(current_pos, candidate_pos, direction):
         else:
             return False
     return True
+
+def is_valid_direction_filter(current_pos, candidate_pos, direction,stream):
+    """
+    Verifica se il candidato (x2, y2) rispetta la condizione direzionale
+    rispetto al punto corrente (x1, y1) in base alla direzione fornita.
+    I valori validi per 'direction' sono "destro", "sinistro", "alto" e "basso".
+    """
+    x1, y1 = current_pos
+    x2, y2 = candidate_pos
+    dist_x = abs(x1 - x2)
+    dist_y = abs(y1 - y2)
     
+    if direction == "verticale":
+        if dist_y>dist_x: 
+            return True    
+        else:
+            return False
+    elif direction == "orizzontale":
+        if dist_y<dist_x: 
+            return True    
+        else:
+            return False
+    return True
+
+
 def breakdown_path(path, pos):
     """
     Data una lista di nodi (path) e il dizionario pos,
@@ -66,7 +90,8 @@ def Creazione_G(tipologia_grafo,df_all,max_distance):
                        y=row["Y"], 
                        tag=row["Tag"], 
                        entity_name=row["Entity Name"], 
-                       size=row["Size"])
+                       size=row["Size"],
+                       stream=row["URL"])
         # 1. Connessione fra Corridoi:
         corridor_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Corridoio"]
         for i, j in itertools.combinations(corridor_nodes, 2):
@@ -74,9 +99,13 @@ def Creazione_G(tipologia_grafo,df_all,max_distance):
             pos_j = (G.nodes[j]["x"], G.nodes[j]["y"])
             dist = abs(pos_j[0] - pos_i[0]) + abs(pos_j[1] - pos_i[1])
             if dist <= max_distance:
-                if is_valid_direction(pos_i, pos_j, G.nodes[i]["size"]):
-                    G.add_edge(i, j, weight=dist)
-         # 2. Connessione Macchina -> Corridoio:
+                if tipologia_grafo=="STD":
+                    if is_valid_direction(pos_i, pos_j, G.nodes[i]["size"]):
+                        G.add_edge(i, j, weight=dist)
+                else
+                    if is_valid_direction_filter(pos_i, pos_j, G.nodes[i]["size"], G.nodes[i]["stream"]):
+                        G.add_edge(i, j, weight=dist)
+        # 2. Connessione Macchina -> Corridoio:
         machine_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Macchina"]
         for machine in machine_nodes:
             machine_pos = (G.nodes[machine]["x"], G.nodes[machine]["y"])
@@ -116,7 +145,7 @@ def main():
     df.update(edited_data)
     
     # Verifica delle colonne necessarie
-    required_cols = ["X", "Y", "Tag", "Entity Name", "Size"]
+    required_cols = ["X", "Y", "Tag", "Entity Name", "Size","URL"]
     for col in required_cols:
         if col not in df.columns:
             st.error(f"Colonna '{col}' mancante nel file.")
@@ -146,43 +175,55 @@ def main():
                                min_value=0.0, max_value=10.0, value=5.0,
                                help="Due nodi vengono collegati se la distanza euclidea è ≤ a questo valore.")
 
+    # Creazione del grafico
+    
+    G_filter=Creazione_G('filter',df_all,max_distance) 
+
+    # Crea due colonne
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        G=Creazione_G('STD',df_all,max_distance)  
+        st.write("Colonna con percorsi senza vincoli")
+        st.write("Numero totale di nodi:", G.number_of_nodes())
+        st.write("Numero totale di archi:", G.number_of_edges())
+        # Preparo la posizione dei nodi per la visualizzazione
+        pos = {node: (data["x"], data["y"]) for node, data in G.nodes(data=True)}
+        corridors = [n for n, d in G.nodes(data=True) if d["tag"] == "Corridoio"]
+        machines = [n for n, d in G.nodes(data=True) if d["tag"] == "Macchina"]
+        # 4. Visualizzazione del grafo
+        st.subheader("Grafico dei Nodi")
+        display_graph(G, pos, corridors, machines)
+        # Creazione della tabella per le connessioni fra corridoi (solo gli archi tra nodi di tipo Corridoio)
+        corridor_edges = []
+        for u, v, data_dict in G.edges(data=True):
+            # Verifichiamo che entrambi i nodi siano di tipo "Corridoio"
+            if G.nodes[u]["tag"] == "Corridoio" and G.nodes[v]["tag"] == "Corridoio":
+                corridor_edges.append({
+                    "Corridoio 1": G.nodes[u].get("entity_name", f"ID: {u}"),
+                    "Corridoio 2": G.nodes[v].get("entity_name", f"ID: {v}"),
+                    "Distanza (m)": data_dict["weight"]
+                })
+        
+        # Creiamo il DataFrame dalle connessioni trovate
+        df_corridor_edges = pd.DataFrame(corridor_edges)
+        
+        # Visualizziamo il DataFrame in forma tabellare e permettiamo la modifica interattiva
+        st.subheader("Tabella delle Connessioni fra Corridoi")
+        edited_edges = st.data_editor(df_corridor_edges, num_rows="dynamic", key="corridor_edges_editor")
+    
+    with col2:
+        st.write("ciao pagina 2")
+        
+
+    
+    
     
 
+    
 
-    G=Creazione_G('STD',df_all,max_distance)  
     
-    st.write("Numero totale di nodi:", G.number_of_nodes())
-    st.write("Numero totale di archi:", G.number_of_edges())
 
-    # Preparo la posizione dei nodi per la visualizzazione
-    pos = {node: (data["x"], data["y"]) for node, data in G.nodes(data=True)}
-    corridors = [n for n, d in G.nodes(data=True) if d["tag"] == "Corridoio"]
-    machines = [n for n, d in G.nodes(data=True) if d["tag"] == "Macchina"]
-    
-    # 4. Visualizzazione del grafo
-    st.subheader("Grafico dei Nodi")
-    display_graph(G, pos, corridors, machines)
-
-    # Creazione della tabella per le connessioni fra corridoi (solo gli archi tra nodi di tipo Corridoio)
-    corridor_edges = []
-    for u, v, data_dict in G.edges(data=True):
-        # Verifichiamo che entrambi i nodi siano di tipo "Corridoio"
-        if G.nodes[u]["tag"] == "Corridoio" and G.nodes[v]["tag"] == "Corridoio":
-            corridor_edges.append({
-                "Corridoio 1": G.nodes[u].get("entity_name", f"ID: {u}"),
-                "Corridoio 2": G.nodes[v].get("entity_name", f"ID: {v}"),
-                "Distanza (m)": data_dict["weight"]
-            })
-    
-    # Creiamo il DataFrame dalle connessioni trovate
-    df_corridor_edges = pd.DataFrame(corridor_edges)
-    
-    # Visualizziamo il DataFrame in forma tabellare e permettiamo la modifica interattiva
-    st.subheader("Tabella delle Connessioni fra Corridoi")
-    edited_edges = st.data_editor(df_corridor_edges, num_rows="dynamic", key="corridor_edges_editor")
-
-    # Visualizza
-    
     # 5. Calcolo dei percorsi per tutte le coppie di macchine
     st.subheader("Calcolo dei percorsi per tutte le coppie di macchine")
     results = []
