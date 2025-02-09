@@ -186,12 +186,12 @@ def main():
     # 3. Costruzione del grafo
     st.subheader("Costruzione del grafo")
     max_distance = st.slider("Distanza massima per collegare i nodi", 
-                               min_value=0.0, max_value=10.0, value=5.0,
+                               min_value=0.0, max_value=5.0, value=3.0,
                                help="Due nodi vengono collegati se la distanza euclidea è ≤ a questo valore.")
     
     # Crea un radio button per scegliere fra due valori
     G=Creazione_G('STD',df_all,max_distance) 
-    G_filter=Creazione_G('filter',df_all,max_distance/2)
+    G_filter=Creazione_G('filter',df_all,max_distance)
     
     st.subheader("Scegli la visualizzazione")
     scelta = st.radio("Scegli il valore:", ("Ottimale", "Corridoi vincolati"),index=0)
