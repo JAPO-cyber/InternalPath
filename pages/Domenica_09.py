@@ -22,7 +22,7 @@ def is_valid_direction(current_pos, candidate_pos, direction):
         return y2 < y1
     elif direction == "basso":
         return y2 > y1
-    return False
+    return True
 
 def greedy_path(G, source, target, pos):
     """
@@ -178,7 +178,7 @@ def main():
         pos_j = (G.nodes[j]["x"], G.nodes[j]["y"])
         dist = math.dist(pos_i, pos_j)
         if dist <= max_distance:
-            if is_valid_direction(pos_i, pos_j, G.nodes[j]["Size"]):
+            if is_valid_direction(pos_i, pos_j, G.nodes[j]["size"]):
                 G.add_edge(i, j, weight=dist)
             
     # 2. Connessione Macchina -> Corridoio:
