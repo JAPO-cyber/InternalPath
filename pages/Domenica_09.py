@@ -16,8 +16,8 @@ def is_valid_direction(current_pos, candidate_pos, direction):
     x2, y2 = candidate_pos
     dist_x = abs(x1 - x2)
     dist_y = abs(y1 - y2)
-    direction = direction.split('_')[0]
-    direction_path=direction.split('_')[1]
+    direction = str(direction).split('_')[0]
+    direction_path=str(direction).split('_')[1]
 
     if direction == "verticale":
         if dist_y>dist_x: 
