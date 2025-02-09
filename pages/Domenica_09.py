@@ -40,7 +40,7 @@ def is_valid_direction_filter(current_pos, candidate_pos, direction,stream):
             return True    
         else:
             return False  
-    return True
+    else: return False
 
 def breakdown_path(path, pos):
     """
