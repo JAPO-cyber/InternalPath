@@ -40,7 +40,7 @@ def breakdown_path(path, pos):
         segments.append(f"{d:.2f}")
     return " + ".join(segments)
 
-def display_graph(G, pos, corridors, machines):
+def display_graph(G, pos, corridors, machines,max_distance):
     """
     Visualizza il grafo con:
       - Nodi "Corridoio" in skyblue
@@ -149,7 +149,7 @@ def main():
     
 
 
-    G=Creazione_G('STD',df_all)  
+    G=Creazione_G('STD',df_all,max_distance)  
     
     st.write("Numero totale di nodi:", G.number_of_nodes())
     st.write("Numero totale di archi:", G.number_of_edges())
