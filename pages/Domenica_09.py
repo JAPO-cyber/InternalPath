@@ -41,9 +41,9 @@ def is_valid_direction_filter(current_pos, candidate_pos, direction,stream):
         direction = str(direction)
         
     if direction == "verticale":
-        st.write(f"Sono nell'IF verticale")
-        if dist_y>dist_x: x=False  
-        else: x=False
+        
+        if dist_y>dist_x: x=False  st.write(f"Sono nell'IF verticale condizione 1")
+        else: x=False st.write(f"Sono nell'IF verticale condizione 2")
     elif direction == "orizzontale":
         if dist_y<dist_x:   x=False  
         else: x=False
