@@ -219,6 +219,24 @@ def main():
     # 4. Visualizzazione del grafo
     st.subheader("Grafico dei Nodi")
     display_graph(G, pos, corridors, machines)
+
+    # Stampa a schermo tutti i corridoi trovati e le relative distanze
+    st.subheader("Elenco dei Corridoi e Distanze Relative")
+    for corridor in corridor_nodes:
+        # Recupera il nome del corridoio (o un identificativo)
+        corridor_name = G.nodes[corridor].get("entity_name", f"ID: {corridor}")
+        st.write(f"**Corridoio:** {corridor_name} (ID: {corridor})")
+        # Per ogni corridoio, raccogliamo i collegamenti con altri corridoi
+        collegamenti = []
+        for neighbor in G.neighbors(corridor):
+            if G.nodes[neighbor]["tag"] == "Corridoio":
+                distance = G[corridor][neighbor]["weight"]
+                neighbor_name = G.nodes[neighbor].get("entity_name", f"ID: {neighbor}")
+                collegamenti.append(f"{neighbor_name} (ID: {neighbor}) -> {distance:.2f} m")
+        if collegamenti:
+            st.write("Collegamenti:", ", ".join(collegamenti))
+        else:
+            st.write("Nessun collegamento con altri corridoi.")
     
     # 5. Calcolo dei percorsi per tutte le coppie di macchine
     st.subheader("Calcolo dei percorsi per tutte le coppie di macchine")
