@@ -184,7 +184,7 @@ def main():
     
     # Crea un radio button per scegliere fra due valori
     G=Creazione_G('STD',df_all,max_distance) 
-    G_filter=Creazione_G('filter',df_all,max_distance)
+    G_filter=Creazione_G('filter',df_all,max_distance/2)
     
     st.subheader("Scegli la visualizzazione")
     scelta = st.radio("Scegli il valore:", ("Ottimale", "Corridoi vincolati"),index=0)
