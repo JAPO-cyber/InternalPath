@@ -167,23 +167,20 @@ def main():
                    entity_name=row["Entity Name"], 
                    size=row["Size"])
     
-    # --------------------------
-    # Creazione degli archi con filtro direzionale
-    #
     # 1. Connessione fra Corridoi:
-    #    Si collegano due nodi di tipo Corridoio se:
-    #      - La distanza euclidea è ≤ max_distance
-    #      - E almeno uno dei due rispetta la condizione direzionale rispetto all'altro
-    #        (ossia, viene usato il vincolo "Size" del corridoio).
+#    Si collegano due nodi di tipo Corridoio se:
+#      - La distanza euclidea è ≤ max_distance
+#      - E solo se il punto di partenza (il primo nodo della coppia) rispetta la condizione direzionale
+#        in base al proprio vincolo "Size".
     corridor_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Corridoio"]
     for i, j in itertools.combinations(corridor_nodes, 2):
         pos_i = (G.nodes[i]["x"], G.nodes[i]["y"])
         pos_j = (G.nodes[j]["x"], G.nodes[j]["y"])
         dist = math.dist(pos_i, pos_j)
         if dist <= max_distance:
-            if is_valid_direction(pos_i, pos_j, G.nodes[i]["size"]) or is_valid_direction(pos_j, pos_i, G.nodes[j]["size"]):
+            if is_valid_direction(pos_i, pos_j, G.nodes[j]["size"]):
                 G.add_edge(i, j, weight=dist)
-    
+            
     # 2. Connessione Macchina -> Corridoio:
     #    Per ogni Macchina, si collega una sola volta al Corridoio più vicino che rispetti
     #    la condizione direzionale indicata dal Corridoio (il vincolo "Size" viene applicato
@@ -196,7 +193,8 @@ def main():
         for corridor in corridor_nodes:
             corridor_pos = (G.nodes[corridor]["x"], G.nodes[corridor]["y"])
             dist = math.dist(machine_pos, corridor_pos)
-            if dist < best_dist and dist <= max_distance and is_valid_direction(machine_pos, corridor_pos, G.nodes[corridor]["size"]):
+            # Si considera solo la distanza, senza il controllo del vincolo direzionale.
+            if dist < best_dist and dist <= max_distance:
                 best_dist = dist
                 best_corridor = corridor
         if best_corridor is not None:
