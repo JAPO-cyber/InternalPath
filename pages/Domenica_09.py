@@ -19,8 +19,6 @@ def is_valid_direction(current_pos, candidate_pos, direction):
     
     if not isinstance(direction, str):
         direction = str(direction)
-    if not isinstance(stream, str):
-        stream = str(stream)
     if direction == "verticale":      
         if dist_y>dist_x: 
             x=True 
