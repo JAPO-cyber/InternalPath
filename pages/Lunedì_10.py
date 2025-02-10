@@ -90,7 +90,7 @@ def display_graph(G, pos, corridors, machines):
     st.pyplot(fig)
 
 def Creazione_G(tipologia_grafo,df_all,max_distance):
-        G = nx.Graph()
+        G = nx.DiGraph()
         for idx, row in df_all.iterrows():
             G.add_node(idx, 
                        x=row["X"], 
