@@ -42,19 +42,22 @@ def is_valid_direction_filter(entity_i,entity_j,current_pos, candidate_pos, dire
     if not isinstance(stream, str):
         stream = str(stream)
 
-    if stream == "destro":
-        if x2 > x1: x=True 
-    elif stream == "sinistro":
-        if x2 < x1: x=True 
-    elif stream == "alto":
-        if y2 > y1: x=True  
-    elif stream == "basso":
-        if y2 < y1: x=True
-    elif stream == "orizzontale": 
-        if dist_y<dist_x:   x=True
-    elif direction == "verticale":      
-        if dist_y>dist_x:   x=True 
-    else: x=True
+    # Applicare la direzione del flusso (stream) come vincolo
+    if stream == "destro":   # Muoversi solo verso destra →
+        x = x2 > x1
+    elif stream == "sinistro":  # Muoversi solo verso sinistra ←
+        x = x2 < x1
+    elif stream == "alto":  # Muoversi solo verso l'alto ↑
+        x = y2 > y1
+    elif stream == "basso":  # Muoversi solo verso il basso ↓
+        x = y2 < y1
+    elif stream == "orizzontale":  # Preferire spostamenti orizzontali
+        x = dist_y < dist_x
+    elif direction == "verticale":  # Preferire spostamenti verticali
+        x = dist_y > dist_x
+    else:
+        x = True  # Se nessuna regola specifica, consentire tutte le connessioni
+    
     st.write(f"Current: {entity_i}, Candidate: {entity_j},stream:{stream},L'output della funzione è {x}")
 
     
