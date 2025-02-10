@@ -129,6 +129,7 @@ def Creazione_G(tipologia_grafo,df_all,max_distance):
                     best_corridor = corridor
             if best_corridor is not None and best_dist <= max_distance:
                 G.add_edge(machine, best_corridor, weight=best_dist)
+                G.add_edge(best_corridor,machine, weight=best_dist)
         return G
 
 def main():
