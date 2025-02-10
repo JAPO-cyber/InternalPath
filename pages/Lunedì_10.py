@@ -42,7 +42,7 @@ def is_valid_direction_filter(entity_i,entity_j,current_pos, candidate_pos, dire
     if not isinstance(stream, str):
         stream = str(stream)
 
-     if stream_j is not None and not isinstance(stream_j, str):  # Se il nodo di destinazione ha un vincolo
+    if stream_j is not None and not isinstance(stream_j, str):  # Se il nodo di destinazione ha un vincolo
         stream_j = str(stream_j)
 
     # Se il nodo j ha un vincolo (stream_j), blocco la connessione
