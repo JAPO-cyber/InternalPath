@@ -30,7 +30,7 @@ def is_valid_direction(current_pos, candidate_pos, direction):
     else: x=True
     return x
 
-def is_valid_direction_filter(entity_i,entity_j,current_pos, candidate_pos, direction,stream):
+def is_valid_direction_filter(entity_i,entity_j,current_pos, candidate_pos, direction,stream,stream_j):
     x1, y1 = current_pos
     x2, y2 = candidate_pos
     dist_x = abs(x1 - x2)
@@ -41,6 +41,15 @@ def is_valid_direction_filter(entity_i,entity_j,current_pos, candidate_pos, dire
         direction = str(direction)    
     if not isinstance(stream, str):
         stream = str(stream)
+
+     if stream_j is not None and not isinstance(stream_j, str):  # Se il nodo di destinazione ha un vincolo
+        stream_j = str(stream_j)
+
+    # Se il nodo j ha un vincolo (stream_j), blocco la connessione
+    if stream_j in ["destro", "sinistro", "alto", "basso"]:
+        st.write(f"🚫 Connessione bloccata: {entity_j} ha vincolo di direzione '{stream_j}'")
+        return False
+
 
     # Applicare la direzione del flusso (stream) come vincolo
     if stream == "destro":   # Muoversi solo verso destra →
@@ -110,13 +119,14 @@ def Creazione_G(tipologia_grafo,df_all,max_distance):
             entity_j=G.nodes[j]["entity_name"]
             pos_i = (G.nodes[i]["x"], G.nodes[i]["y"])
             pos_j = (G.nodes[j]["x"], G.nodes[j]["y"])
+            stream_j=(G.nodes[j]["stream"], G.nodes[j]["stream"])
             dist = abs(pos_j[0] - pos_i[0]) + abs(pos_j[1] - pos_i[1])
             if dist <= max_distance:
                 if tipologia_grafo=="STD":
                     if is_valid_direction(pos_i, pos_j, G.nodes[i]["size"]):
                         G.add_edge(i, j, weight=dist)
                 else:
-                    if is_valid_direction_filter(entity_i, entity_j,pos_i, pos_j, G.nodes[i]["size"], G.nodes[i]["stream"]):
+                    if is_valid_direction_filter(entity_i, entity_j,pos_i, pos_j, G.nodes[i]["size"], G.nodes[i]["stream"],stream_j):
                         G.add_edge(i, j, weight=dist)
         # 2. Connessione Macchina -> Corridoio:
         machine_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Macchina"]
