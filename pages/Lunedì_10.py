@@ -246,6 +246,7 @@ def main():
             nearest_corridor = min(corridor_neighbors, key=lambda n: math.dist(pos[source], pos[n]))
             if nx.has_path(G, nearest_corridor, target):
                 sub_path = nx.shortest_path(G, source=nearest_corridor, target=target, weight="weight")
+                st.write(f"✅ Percorso trovato: {sub_path}")
                 length_sub = nx.shortest_path_length(G, source=nearest_corridor, target=target, weight="weight")
                 full_path = [source] + sub_path  # Forzo il passaggio: Macchina -> Corridoio -> ... -> Target
                 length_euclid = math.dist(pos[source], pos[nearest_corridor]) + length_sub
