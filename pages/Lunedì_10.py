@@ -69,7 +69,7 @@ def is_valid_direction_filter(entity_i,entity_j,current_pos, candidate_pos, dire
         x=True
     else:
         st.write(f"🚫 Connessione bloccata: {entity_j} ha vincolo di direzione '{stream_j}'")
-        x=True
+        x=False
 
     if x==False:
         st.write(f"Current: {entity_i}, Candidate: {entity_j},stream:{stream}, stream 2:{stream_j},L'output della funzione è {x}")
