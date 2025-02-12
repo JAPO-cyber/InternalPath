@@ -45,8 +45,8 @@ def is_valid_direction_filter(entity_i,entity_j,current_pos, candidate_pos, dire
     if stream_j is not None and not isinstance(stream_j, str):  # Se il nodo di destinazione ha un vincolo
         stream_j = str(stream_j)
 
-
-
+    # Le condizioni sono le seguenti:
+    
 
     # Applicare la direzione del flusso (stream) come vincolo
     if stream == "destro":   # Muoversi solo verso destra →
@@ -63,16 +63,6 @@ def is_valid_direction_filter(entity_i,entity_j,current_pos, candidate_pos, dire
         x = dist_y > dist_x
     else:
         x = True  # Se nessuna regola specifica, consentire tutte le connessioni
-    
-    # Se il nodo j ha un vincolo (stream_j), blocco la connessione
-    #if stream in ["alto", "basso"] and stream_j in ["destro", "sinistro"]:
-    #    x=True
-    #else:
-    #    st.write(f"🚫 Connessione bloccata: {entity_j} ha vincolo di direzione '{stream_j}'")
-    #    x=False
-
-    #if x==False:
-        #st.write(f"Current: {entity_i}, Candidate: {entity_j},stream:{stream}, stream 2:{stream_j},L'output della funzione è {x}")
     
     return x
 
