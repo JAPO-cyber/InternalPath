@@ -120,30 +120,33 @@ def Creazione_G(tipologia_grafo, df_all, max_distance, invert=False):
     # 2. Connessione Macchina -> Corridoio:
     machine_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Macchina"]
     for machine in machine_nodes:
-        # Verifica se la macchina è già collegata a un corridoio
+        # Se la macchina è già collegata a un corridoio, la saltiamo
         if any(G.has_edge(machine, corr) for corr in corridor_nodes):
             continue
         machine_pos = (G.nodes[machine]["x"], G.nodes[machine]["y"])
         best_corridor = None
         best_dist = float('inf')
-        # Ottieni il vincolo direzionale dalla macchina (colonna URL)
         machine_direction = G.nodes[machine]["stream"]
         for corridor in corridor_nodes:
             corridor_pos = (G.nodes[corridor]["x"], G.nodes[corridor]["y"])
-            # Considera solo i corridoi che rispettano il vincolo direzionale della macchina
-            if is_valid_direction_filter(G.nodes[machine]["entity_name"],
-                                         G.nodes[corridor]["entity_name"],
-                                         machine_pos, corridor_pos,
-                                         G.nodes[machine]["size"],
-                                         machine_direction,
-                                         None,
-                                         invert=False):
+            # Se stiamo costruendo un grafo "filter", applica il vincolo direzionale (inverso se richiesto)
+            if tipologia_grafo == "filter":
+                valid = is_valid_direction_filter(G.nodes[machine]["entity_name"],
+                                                  G.nodes[corridor]["entity_name"],
+                                                  machine_pos, corridor_pos,
+                                                  G.nodes[machine]["size"],
+                                                  machine_direction,
+                                                  None,
+                                                  invert=invert)
+            else:
+                valid = True
+            if valid:
                 d = math.dist(machine_pos, corridor_pos)
                 if d < best_dist:
                     best_dist = d
                     best_corridor = corridor
         if best_corridor is not None and best_dist <= max_distance:
-            # Colleghiamo la macchina al corridoio più vicino che soddisfa il vincolo (archi in entrambe le direzioni)
+            # Colleghiamo la macchina al corridoio più vicino che soddisfa il vincolo
             G.add_edge(machine, best_corridor, weight=best_dist)
             G.add_edge(best_corridor, machine, weight=best_dist)
     return G
@@ -197,6 +200,7 @@ def main():
                                min_value=0.0, max_value=5.0, value=4.0,
                                help="Due nodi vengono collegati se la distanza Manhattan è ≤ a questo valore.")
     
+    # Creazione dei grafi:
     G = Creazione_G('STD', df_all, max_distance) 
     G_filter = Creazione_G('filter', df_all, max_distance, invert=False)
     G_filter_inv = Creazione_G('filter', df_all, max_distance, invert=True)
