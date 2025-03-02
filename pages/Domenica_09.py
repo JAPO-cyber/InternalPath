@@ -120,16 +120,30 @@ def Creazione_G(tipologia_grafo, df_all, max_distance, invert=False):
     # 2. Connessione Macchina -> Corridoio:
     machine_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Macchina"]
     for machine in machine_nodes:
+        # Verifica se la macchina è già collegata a un corridoio
+        if any(G.has_edge(machine, corr) for corr in corridor_nodes):
+            continue
         machine_pos = (G.nodes[machine]["x"], G.nodes[machine]["y"])
         best_corridor = None
         best_dist = float('inf')
+        # Ottieni il vincolo direzionale dalla macchina (colonna URL)
+        machine_direction = G.nodes[machine]["stream"]
         for corridor in corridor_nodes:
             corridor_pos = (G.nodes[corridor]["x"], G.nodes[corridor]["y"])
-            d = math.dist(machine_pos, corridor_pos)
-            if d < best_dist:
-                best_dist = d
-                best_corridor = corridor
+            # Considera solo i corridoi che rispettano il vincolo direzionale della macchina
+            if is_valid_direction_filter(G.nodes[machine]["entity_name"],
+                                         G.nodes[corridor]["entity_name"],
+                                         machine_pos, corridor_pos,
+                                         G.nodes[machine]["size"],
+                                         machine_direction,
+                                         None,
+                                         invert=False):
+                d = math.dist(machine_pos, corridor_pos)
+                if d < best_dist:
+                    best_dist = d
+                    best_corridor = corridor
         if best_corridor is not None and best_dist <= max_distance:
+            # Colleghiamo la macchina al corridoio più vicino che soddisfa il vincolo (archi in entrambe le direzioni)
             G.add_edge(machine, best_corridor, weight=best_dist)
             G.add_edge(best_corridor, machine, weight=best_dist)
     return G
@@ -143,15 +157,14 @@ def main():
         st.info("Carica un file per iniziare.")
         return
 
-    # Determiniamo il tipo di file in base all'estensione
     if uploaded_file.name.lower().endswith('.csv'):
         df = pd.read_csv(uploaded_file)
     else:
         df = pd.read_excel(uploaded_file)
     
-    # 2. Anteprima e modifica del DataFrame (solo le colonne "Entity Name", "Size" e "URL")
+    # 2. Anteprima e modifica del DataFrame (colonne "Entity Name", "Size" e "URL")
     st.subheader("Anteprima e modifica dei dati")
-    edited_data = st.data_editor(df[['Entity Name', 'Size','URL']], num_rows="dynamic")
+    edited_data = st.data_editor(df[['Entity Name', 'Size', 'URL']], num_rows="dynamic")
     df.update(edited_data)
     
     # Verifica delle colonne necessarie
@@ -176,7 +189,6 @@ def main():
         st.warning("Nessuna macchina presente.")
         return
     
-    # Unione dei dati in un unico DataFrame
     df_all = pd.concat([df_corridor, df_machine])
     
     # 3. Costruzione del grafo
@@ -185,7 +197,6 @@ def main():
                                min_value=0.0, max_value=5.0, value=4.0,
                                help="Due nodi vengono collegati se la distanza Manhattan è ≤ a questo valore.")
     
-    # Creazione dei grafi:
     G = Creazione_G('STD', df_all, max_distance) 
     G_filter = Creazione_G('filter', df_all, max_distance, invert=False)
     G_filter_inv = Creazione_G('filter', df_all, max_distance, invert=True)
@@ -202,15 +213,13 @@ def main():
     st.write("Numero totale di nodi:", G_graph.number_of_nodes())
     st.write("Numero totale di archi:", G_graph.number_of_edges())
     
-    # Preparo la posizione dei nodi per la visualizzazione
     pos = {node: (data["x"], data["y"]) for node, data in G_graph.nodes(data=True)}
     corridors = [n for n, d in G_graph.nodes(data=True) if d["tag"] == "Corridoio"]
     machines = [n for n, d in G_graph.nodes(data=True) if d["tag"] == "Macchina"]
-    # 4. Visualizzazione del grafo
+    
     st.subheader("Grafico dei Nodi")
     display_graph(G_graph, pos, corridors, machines)
     
-    # Creazione della tabella per le connessioni fra corridoi (solo gli archi tra nodi di tipo Corridoio)
     corridor_edges = []
     for u, v, data_dict in G_graph.edges(data=True):
         if G_graph.nodes[u]["tag"] == "Corridoio" and G_graph.nodes[v]["tag"] == "Corridoio":
@@ -224,7 +233,6 @@ def main():
     st.subheader("Tabella delle Connessioni fra Corridoi")
     edited_edges = st.data_editor(df_corridor_edges, num_rows="dynamic", key="corridor_edges_editor")
     
-    # 5. Calcolo dei percorsi per tutte le coppie di macchine
     st.subheader("Calcolo dei percorsi per tutte le coppie di macchine")
     results = []
     machine_nodes_sorted = sorted([n for n, d in G.nodes(data=True) if d["tag"] == "Macchina"],
@@ -235,10 +243,8 @@ def main():
         target_name = G.nodes[target]["entity_name"]
         collegamento = f"{source_name} --> {target_name}"
         
-        # Trova il corridoio più vicino per il nodo sorgente
         corridor_neighbors = [n for n in G.neighbors(source) if G.nodes[n]["tag"] == "Corridoio"]
         
-        # --- Percorso Ottimale (senza vincoli aggiuntivi) da A a B ---
         if corridor_neighbors:
             nearest_corridor = min(corridor_neighbors, key=lambda n: math.dist(pos[source], pos[n]))
             if nx.has_path(G, nearest_corridor, target):
@@ -257,7 +263,6 @@ def main():
             dettaglio_ottimale = ""
             length_euclid = None
         
-        # --- Percorso Vincolato Andata (usando G_filter) ---
         if corridor_neighbors:
             nearest_corridor = min(corridor_neighbors, key=lambda n: math.dist(pos[source], pos[n]))
             if nx.has_path(G_filter, nearest_corridor, target):
@@ -276,8 +281,6 @@ def main():
             dettaglio_greedy = ""
             length_greedy = None
         
-        # --- Percorso Vincolato Ritorno (calcolato con G_filter_inv, da B a A) ---
-        # Per il ritorno, partiamo dal nodo target e cerchiamo il corridoio più vicino tra i suoi vicini.
         corridor_neighbors_return = [n for n in G_filter_inv.neighbors(target) if G_filter_inv.nodes[n]["tag"] == "Corridoio"]
         if corridor_neighbors_return:
             nearest_corridor_return = min(corridor_neighbors_return, key=lambda n: math.dist(pos[target], pos[n]))
@@ -314,7 +317,6 @@ def main():
     st.subheader("Risultati per tutte le coppie di macchine")
     st.dataframe(df_results)
     
-    # 6. Download del file Excel con i risultati
     towrite = io.BytesIO()
     with pd.ExcelWriter(towrite, engine='xlsxwriter') as writer:
         df_results.to_excel(writer, index=False, sheet_name='Risultati')
