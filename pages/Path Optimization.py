@@ -189,7 +189,7 @@ def main():
     # 3. Costruzione del grafo
     st.subheader("Costruzione del grafo")
     max_distance = st.slider("Distanza massima per collegare i nodi", 
-                               min_value=0.0, max_value=5.0, value=4.0,
+                               min_value=0.0, max_value=50.0, value=4.0,
                                help="Due nodi vengono collegati se la distanza euclidea è ≤ a questo valore.")
     
     # Crea un radio button per scegliere fra due valori
