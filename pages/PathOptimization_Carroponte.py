@@ -97,7 +97,7 @@ def Creazione_G(tipologia_grafo, df_all, max_distance):
         entity_j = G.nodes[j]["entity_name"]
         pos_i = (G.nodes[i]["x"], G.nodes[i]["y"])
         pos_j = (G.nodes[j]["x"], G.nodes[j]["y"])
-        stream_j = (G.nodes[j]["stream"])
+        stream_j = G.nodes[j]["stream"]
         dist = abs(pos_j[0] - pos_i[0]) + abs(pos_j[1] - pos_i[1])
         if dist <= max_distance:
             if tipologia_grafo == "STD":
@@ -136,8 +136,12 @@ def main():
     else:
         df = pd.read_excel(uploaded_file)
     
+    # Rimuovo " m" dalle colonne X e Y per evitare problemi di conversione
+    df["X"] = df["X"].astype(str).str.replace(" m", "")
+    df["Y"] = df["Y"].astype(str).str.replace(" m", "")
+    
     st.subheader("Anteprima e modifica dei dati")
-    edited_data = st.data_editor(df[['Entity Name', 'Size','URL']], num_rows="dynamic")
+    edited_data = st.data_editor(df[['Entity Name', 'Size', 'URL']], num_rows="dynamic")
     df.update(edited_data)
     
     required_cols = ["X", "Y", "Tag", "Entity Name", "Size", "URL"]
@@ -234,7 +238,7 @@ def main():
             dettaglio_ottimale = ""
             length_euclid = None
         
-        # --- Percorso Greedy con vincolo del primo Corridoio e logica extra ---
+        # --- Percorso Vincolato (Greedy) e aggiornamento extra ---
         if corridor_neighbors:
             nearest_corridor = min(corridor_neighbors, key=lambda n: math.dist(pos[source], pos[n]))
             if nx.has_path(G_filter, nearest_corridor, target):
@@ -253,28 +257,36 @@ def main():
                 componente_carrello = ""
                 metri_carrello = 0.0
                 
-                # Itero sui segmenti del percorso vincolato
+                # Itero su tutti i segmenti del percorso Greedy
                 for i in range(len(full_path_greedy) - 1):
                     current_node = full_path_greedy[i]
                     next_node = full_path_greedy[i+1]
-                    # Aggiorno solo se il nodo di destinazione è un Corridoio
-                    if G.nodes[next_node]["tag"] != "Corridoio":
-                        continue
-                    d = math.dist(pos[current_node], pos[next_node])
-                    dest_name = G.nodes[next_node]["entity_name"]
-                    dest_letter = dest_name.strip()[0].upper()
                     
-                    # Se il nodo di partenza è un Corridoio, prendo la sua lettera, altrimenti None
-                    if G.nodes[current_node]["tag"] == "Corridoio":
+                    # Se non siamo all'ultimo segmento e il nodo di destinazione non è un Corridoio, lo saltiamo
+                    if i != len(full_path_greedy) - 2 and G.nodes[next_node]["tag"] != "Corridoio":
+                        continue
+                        
+                    # Calcolo la distanza del segmento
+                    d = math.dist(pos[current_node], pos[next_node])
+                    
+                    # Se siamo all'ultimo segmento e il next_node è una Macchina, usiamo la lettera del corrente (che è Corridoio)
+                    if i == len(full_path_greedy) - 2 and G.nodes[next_node]["tag"] != "Corridoio":
+                        # Uso la lettera del nodo corrente (corridoio)
                         source_letter = G.nodes[current_node]["entity_name"].strip()[0].upper()
+                        dest_letter = source_letter
                     else:
-                        source_letter = None
+                        dest_name = G.nodes[next_node]["entity_name"]
+                        dest_letter = dest_name.strip()[0].upper()
+                        if G.nodes[current_node]["tag"] == "Corridoio":
+                            source_letter = G.nodes[current_node]["entity_name"].strip()[0].upper()
+                        else:
+                            source_letter = None
                     
                     if dest_letter == "C":
-                        # Se non vengo da un Corridoio C, incremento la presa
+                        # Se non vengo da un Corridoio C (ovvero non è una ripetizione) incremento la presa
                         if source_letter != "C":
                             presa_carroponte += 1
-                        # Aggiorno componente e metri
+                        # Aggiorno sempre i campi componente e metri
                         if componente_carroponte == "":
                             componente_carroponte = f"{d:.2f}"
                         else:
@@ -343,5 +355,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
