@@ -62,11 +62,21 @@ def is_valid_direction_filter(entity_i, entity_j, current_pos, candidate_pos, di
     return x
 
 def breakdown_path(path, pos):
+    """
+    Restituisce una stringa del tipo "0.05 + 0.49 = 0.54"
+    mostrando sia i segmenti che la somma finale.
+    """
     segments = []
+    total = 0.0
     for i in range(len(path) - 1):
         d = math.dist(pos[path[i]], pos[path[i+1]])
-        segments.append(f"{d}")
-    return " + ".join(segments)
+        segments.append(d)
+        total += d
+    
+    # Creiamo una stringa con tutti i segmenti + la somma finale
+    detail_str = " + ".join(f"{seg:.5f}" for seg in segments)
+    detail_str += f" = {total:.5f}"
+    return detail_str, total
 
 def display_graph(G, pos, corridors, machines):
     fig, ax = plt.subplots(figsize=(8, 6))
@@ -210,26 +220,37 @@ def main():
 
     st.subheader("Calcolo dei percorsi per tutte le coppie di macchine")
     results = []
-    machine_nodes_sorted = sorted([n for n, d in G.nodes(data=True) if d["tag"] == "Macchina"],
-                                  key=lambda n: G.nodes[n]["entity_name"])
+
+    # Per semplificare la gestione, usiamo sempre G per calcolare l'elenco delle macchine
+    machine_nodes_sorted = sorted(
+        [n for n, d in G.nodes(data=True) if d["tag"] == "Macchina"],
+        key=lambda n: G.nodes[n]["entity_name"]
+    )
 
     for source, target in itertools.permutations(machine_nodes_sorted, 2):
         source_name = G.nodes[source]["entity_name"]
         target_name = G.nodes[target]["entity_name"]
         collegamento = f"{source_name} --> {target_name}"
         
+        # ----------------------------------------------------------
+        # PERCORSO OTTIMALE
+        # ----------------------------------------------------------
         corridor_neighbors = [n for n in G.neighbors(source) if G.nodes[n]["tag"] == "Corridoio"]
         
         if corridor_neighbors:
+            # Prendiamo il corridoio più vicino in termini di distanza euclidea
             nearest_corridor = min(corridor_neighbors, key=lambda n: math.dist(pos[source], pos[n]))
+            # Verifichiamo se c'è un path da nearest_corridor a target nel grafo G
             if nx.has_path(G, nearest_corridor, target):
                 sub_path = nx.shortest_path(G, source=nearest_corridor, target=target, weight="weight")
-                st.write(f"✅ Percorso trovato: {sub_path}")
-                length_sub = nx.shortest_path_length(G, source=nearest_corridor, target=target, weight="weight")
+                # full_path = Macchina + (sub_path corridoi) = percorso completo
                 full_path = [source] + sub_path
-                length_euclid = math.dist(pos[source], pos[nearest_corridor]) + length_sub
+
+                # Calcoliamo la distanza totale sommando i segmenti euclidei
+                dettaglio_ottimale, total_ottimale = breakdown_path(full_path, pos)
+                
                 percorso_ottimale = " --> ".join(G.nodes[n]["entity_name"] for n in full_path)
-                dettaglio_ottimale = breakdown_path(full_path, pos)
+                length_euclid = total_ottimale
             else:
                 percorso_ottimale = "Nessun percorso"
                 dettaglio_ottimale = ""
@@ -239,18 +260,22 @@ def main():
             dettaglio_ottimale = ""
             length_euclid = None
         
-        # --- Percorso Vincolato (Greedy) e aggiornamento extra ---
+        # ----------------------------------------------------------
+        # PERCORSO VINCOLATO (G_filter)
+        # ----------------------------------------------------------
         if corridor_neighbors:
             nearest_corridor = min(corridor_neighbors, key=lambda n: math.dist(pos[source], pos[n]))
             if nx.has_path(G_filter, nearest_corridor, target):
                 sub_path = nx.shortest_path(G_filter, source=nearest_corridor, target=target, weight="weight")
-                length_sub = nx.shortest_path_length(G_filter, source=nearest_corridor, target=target, weight="weight")
                 full_path_greedy = [source] + sub_path
-                length_greedy = math.dist(pos[source], pos[nearest_corridor]) + length_sub
+
+                dettaglio_greedy, total_greedy = breakdown_path(full_path_greedy, pos)
                 percorso_greedy = " --> ".join(G_filter.nodes[n]["entity_name"] for n in full_path_greedy)
-                dettaglio_greedy = breakdown_path(full_path_greedy, pos)
+                length_greedy = total_greedy
                 
-                # Inizializzo i campi per carroponte e carrello
+                # --------------------------------------------------
+                # Calcolo campi per carroponte e carrello
+                # --------------------------------------------------
                 presa_carroponte = 0
                 componente_carroponte = ""
                 metri_carroponte = 0.0
@@ -258,7 +283,6 @@ def main():
                 componente_carrello = ""
                 metri_carrello = 0.0
                 
-                # Itero su tutti i segmenti del percorso Greedy
                 for i in range(len(full_path_greedy) - 1):
                     current_node = full_path_greedy[i]
                     next_node = full_path_greedy[i+1]
@@ -270,7 +294,7 @@ def main():
                     # Calcolo la distanza del segmento
                     d = math.dist(pos[current_node], pos[next_node])
                     
-                    # Se siamo all'ultimo segmento e il next_node è una Macchina, usiamo la lettera del corrente (che è Corridoio)
+                    # Lettere iniziali (es. Corridoio "Cxxx", Macchina "Mxxx", ecc.)
                     if i == len(full_path_greedy) - 2 and G.nodes[next_node]["tag"] != "Corridoio":
                         # Uso la lettera del nodo corrente (corridoio)
                         source_letter = G.nodes[current_node]["entity_name"].strip()[0].upper()
@@ -284,10 +308,10 @@ def main():
                             source_letter = None
                     
                     if dest_letter == "C":
-                        # Se non vengo da un Corridoio C (ovvero non è una ripetizione) incremento la presa
+                        # Se non vengo da un Corridoio C, incremento la presa
                         if source_letter != "C":
                             presa_carroponte += 1
-                        # Aggiorno sempre i campi componente e metri
+                        # Aggiorno i campi componente e metri
                         if componente_carroponte == "":
                             componente_carroponte = f"{d:.2f}"
                         else:
@@ -301,6 +325,7 @@ def main():
                         else:
                             componente_carrello += " + " + f"{d:.2f}"
                         metri_carrello += d
+
             else:
                 percorso_greedy = "Nessun percorso"
                 dettaglio_greedy = ""
@@ -322,14 +347,15 @@ def main():
             componente_carrello = ""
             metri_carrello = ""
         
+        # Salviamo i risultati
         results.append({
             "Collegamento Macchina": collegamento,
             "Percorso Ottimale Seguito": percorso_ottimale,
-            "Dettaglio Distanze Ottimale": dettaglio_ottimale,
-            "Lunghezza Totale Ottimale": length_euclid,
+            "Dettaglio Distanze Ottimale": dettaglio_ottimale,  # "0.05 + 0.49 = 0.54"
+            "Lunghezza Totale Ottimale": length_euclid,         # 0.54
             "Percorso Vincolato Seguito": percorso_greedy,
-            "Dettaglio Distanze Vincolato": dettaglio_greedy,
-            "Lunghezza Totale Vincolato": length_greedy,
+            "Dettaglio Distanze Vincolato": dettaglio_greedy,   # "0.05 + 0.49 = 0.54"
+            "Lunghezza Totale Vincolato": length_greedy,        # 0.54
             "presa carroponte": presa_carroponte,
             "componente carroponte": componente_carroponte,
             "metri carroponte": metri_carroponte,
