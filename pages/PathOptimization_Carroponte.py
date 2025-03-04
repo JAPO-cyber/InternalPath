@@ -269,9 +269,9 @@ def main():
                     # Calcolo la distanza del segmento
                     d = math.dist(pos[current_node], pos[next_node])
                     
-                    # Se siamo all'ultimo segmento e il next_node è una Macchina, usiamo la lettera del corrente (che è Corridoio)
+                    # Gestisco il caso in cui siamo sull'ultimo segmento e il nodo di destinazione è una Macchina
                     if i == len(full_path_greedy) - 2 and G.nodes[next_node]["tag"] != "Corridoio":
-                        # Uso la lettera del nodo corrente (corridoio)
+                        # Uso la lettera del nodo corrente (Corridoio)
                         source_letter = G.nodes[current_node]["entity_name"].strip()[0].upper()
                         dest_letter = source_letter
                     else:
@@ -283,14 +283,14 @@ def main():
                             source_letter = None
                     
                     if dest_letter == "C":
-                        # Se non vengo da un Corridoio C (ovvero non è una ripetizione) incremento la presa
+                        # Se il nodo di partenza non era già un Corridoio "C", incremento il contatore presa
                         if source_letter != "C":
                             presa_carroponte += 1
-                        # Aggiorno sempre i campi componente e metri
+                        # Aggiungo sempre l'underscore davanti al valore della distanza
                         if componente_carroponte == "":
-                            componente_carroponte = f"{d:.2f}"
+                            componente_carroponte = f"_{d:.2f}"
                         else:
-                            componente_carroponte += " + " + f"{d:.2f}"
+                            componente_carroponte += " + _" + f"{d:.2f}"
                         metri_carroponte += d
                     elif dest_letter == "V":
                         if source_letter != "V":
