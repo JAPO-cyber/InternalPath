@@ -65,7 +65,7 @@ def breakdown_path(path, pos):
     segments = []
     for i in range(len(path) - 1):
         d = math.dist(pos[path[i]], pos[path[i+1]])
-        segments.append(f"{d:.2f}")
+        segments.append(f)
     return " + ".join(segments)
 
 def display_graph(G, pos, corridors, machines):
