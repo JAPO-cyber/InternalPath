@@ -98,7 +98,8 @@ def Creazione_G(tipologia_grafo, df_all, max_distance):
         pos_i = (G.nodes[i]["x"], G.nodes[i]["y"])
         pos_j = (G.nodes[j]["x"], G.nodes[j]["y"])
         stream_j = G.nodes[j]["stream"]
-        dist = abs(pos_j[0] - pos_i[0]) + abs(pos_j[1] - pos_i[1])
+        # Calcolo della distanza euclidea
+        dist = math.dist(pos_i, pos_j)
         if dist <= max_distance:
             if tipologia_grafo == "STD":
                 if is_valid_direction(pos_i, pos_j, G.nodes[i]["size"]):
@@ -355,6 +356,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
