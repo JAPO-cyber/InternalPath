@@ -174,7 +174,7 @@ def main():
     df_download_1=pd.concat([df_aree_corridor, df_machine])    
     towrite = io.BytesIO()
     with pd.ExcelWriter(towrite, engine='xlsxwriter') as writer:
-        df_results.to_excel(writer, index=False, sheet_name='Risultati')
+        df_download_1.to_excel(writer, index=False, sheet_name='Aree')
     towrite.seek(0)
     st.download_button(
         label="Scarica file Excel",
@@ -182,7 +182,6 @@ def main():
         file_name="aree e corridoi.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-
     
     if df_corridor.empty:
         st.warning("Nessun corridoio presente. Impossibile costruire il grafo.")
