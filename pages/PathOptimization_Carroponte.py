@@ -155,8 +155,7 @@ def main():
     st.subheader("Anteprima e modifica dei dati")
     edited_data = st.data_editor(df[df.columns[:5]], num_rows="dynamic")
     df.update(edited_data)
-    
-    required_cols = ["X", "Y", "Tag", "Entity Name", "Size", "URL"]
+    required_cols = ["X", "Y","LenX","LenY", "Tag", "Entity Name", "Size", "URL"]
     for col in required_cols:
         if col not in df.columns:
             st.error(f"Colonna '{col}' mancante nel file.")
@@ -164,9 +163,12 @@ def main():
 
     df["X"] = pd.to_numeric(df["X"], errors="coerce")
     df["Y"] = pd.to_numeric(df["Y"], errors="coerce")
+    df["LenX"] = pd.to_numeric(df["X"], errors="coerce")
+    df["LenY"] = pd.to_numeric(df["Y"], errors="coerce")
     
     df_corridor = df[df["Tag"] == "Corridoio"].copy()
     df_machine = df[df["Tag"] == "Macchina"].copy()
+    df_aree_corridor= df[df["Tag"] == "Area Corridoio"].copy()
     
     if df_corridor.empty:
         st.warning("Nessun corridoio presente. Impossibile costruire il grafo.")
