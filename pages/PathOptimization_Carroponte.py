@@ -5,6 +5,8 @@ import math
 import itertools
 import matplotlib.pyplot as plt
 import io
+import PIL.Image
+import numpy as np
 
 def is_valid_direction(current_pos, candidate_pos, direction):
     x1, y1 = current_pos
@@ -390,6 +392,7 @@ def main():
     # --------------------------
     # CARICAMENTO E VISUALIZZAZIONE FLUSSI DA EXCEL (con sfondo trasparente)
     # --------------------------
+
     st.subheader("Caricamento Excel Flussi")
     
     flow_file = st.file_uploader(
@@ -439,101 +442,142 @@ def main():
             flow_graph_width = st.slider("Larghezza del grafico (Flussi)", 6, 20, 8)
             flow_graph_height = st.slider("Altezza del grafico (Flussi)", 6, 20, 6)
     
-            # Creiamo una mappa da entity_name -> ID nodo (usiamo il grafo selezionato: G_graph)
-            # Se un nodo non ha "entity_name", usiamo un valore di fallback "node_<id>"
-            mapping = { data.get("entity_name", f"node_{node}"): node 
-                        for node, data in G_graph.nodes(data=True) }
+            # --------------------------
+            # Caricamento dell'immagine di sfondo
+            # --------------------------
+            bg_file = st.file_uploader("Carica un'immagine di sfondo (PNG/JPG)", type=["png", "jpg", "jpeg"])
+            bg_image = None
+            if bg_file is not None:
+                # Apriamo l'immagine e la convertiamo in array numpy
+                pil_img = PIL.Image.open(bg_file)
+                bg_image = np.array(pil_img)
+    
+            # --------------------------
+            # Esempio: usiamo G_graph e pos già definiti altrove
+            # Se preferisci usare G o G_filter, sostituisci la variabile.
+            # Assumiamo che i nodi abbiano la chiave "entity_name" e "tag".
+            # --------------------------
+            # Creiamo la mappa da entity_name -> ID nodo
+            mapping = {
+                data.get("entity_name", f"node_{node}"): node
+                for node, data in G_graph.nodes(data=True)
+            }
     
             # Posizioni dei nodi
-            # (assumiamo tu abbia già definito pos = {node: (x, y) ...} per G_graph)
-            pos_local = pos
+            pos_local = pos  # Adatta se necessario
     
-            # Prepariamo una lista di colori (riutilizzati in caso di sequenze numerose)
+            # Calcoliamo i min/max delle coordinate per adattare lo sfondo
+            xs = [pos_local[n][0] for n in G_graph.nodes()]
+            ys = [pos_local[n][1] for n in G_graph.nodes()]
+            min_x, max_x = min(xs), max(xs)
+            min_y, max_y = min(ys), max(ys)
+    
+            # --------------------------
+            # Prepariamo i colori e la figura
+            # --------------------------
             available_colors = [
                 "red", "blue", "green", "orange", "purple",
                 "brown", "pink", "gray", "cyan", "magenta"
             ]
-            # Mappatura Sequenza -> Colore
             sequence_color_map = {}
     
-            # Creiamo la figura con sfondo trasparente
             fig_flow, ax_flow = plt.subplots(figsize=(flow_graph_width, flow_graph_height))
-            fig_flow.patch.set_facecolor('none')   # Sfondo figura trasparente
-            ax_flow.set_facecolor('none')          # Sfondo assi trasparente
+            # Sfondo trasparente per la figura e per gli assi
+            fig_flow.patch.set_facecolor('none')
+            ax_flow.set_facecolor('none')
     
-            # (Opzionale) Disegno di sfondo del grafo completo in tonalità chiara
-            nx.draw_networkx_nodes(G_graph, pos_local, node_size=50, node_color="lightgray", ax=ax_flow)
-            nx.draw_networkx_edges(G_graph, pos_local, alpha=0.2, ax=ax_flow)
+            # Se abbiamo un'immagine di sfondo, la disegniamo
+            if bg_image is not None:
+                ax_flow.imshow(
+                    bg_image,
+                    extent=(min_x, max_x, min_y, max_y),
+                    zorder=0,
+                    aspect='auto'
+                )
     
-            # Per mostrare i dettagli a fine disegno
+            # Disegniamo i nodi dell'intero grafo in grigio chiaro (senza archi/frecce)
+            nx.draw_networkx_nodes(
+                G_graph, pos_local,
+                node_size=50,
+                node_color="lightgray",
+                ax=ax_flow
+            )
+    
+            # Lista di dict per i dettagli a fine disegno
             df_flow_details = []
+            used_sequences = set()  # per la legenda finale
     
-            # Cicliamo sulle righe filtrate
             for idx, row in df_filtered_flows.iterrows():
                 flusso = row["Flussi"]
                 path_str = row["Path"]
                 seq = row["Sequenza"]
     
-                # Se la sequenza non è ancora nel dizionario, le assegniamo un colore
+                # Se la sequenza non è ancora nel dizionario, assegniamo un colore
                 if seq not in sequence_color_map:
                     sequence_color_map[seq] = available_colors[len(sequence_color_map) % len(available_colors)]
                 color = sequence_color_map[seq]
+                used_sequences.add(seq)
     
-                # Ricaviamo i nomi dei nodi dal Path (es. "INGRESSO CAMP 2 --> BARE ORIZZONTALI")
+                # Ricaviamo i nomi dei nodi dal Path
                 route_nodes_names = [p.strip() for p in path_str.split("-->")]
-    
                 # Convertiamo i nomi in ID nodi, filtrando quelli non trovati
                 route_node_ids = [mapping[name] for name in route_nodes_names if name in mapping]
     
-                # Se abbiamo almeno due nodi, costruiamo gli archi
-                if len(route_node_ids) > 1:
-                    route_edges = [
-                        (route_node_ids[i], route_node_ids[i+1]) 
-                        for i in range(len(route_node_ids)-1)
-                    ]
-    
-                    # Disegniamo gli archi del percorso con il colore della sequenza
-                    nx.draw_networkx_edges(
-                        G_graph, pos_local, edgelist=route_edges,
-                        width=2, edge_color=color, ax=ax_flow
+                # Se c'è almeno 1 nodo, coloriamo TUTTI i nodi del percorso con "color"
+                if route_node_ids:
+                    nx.draw_networkx_nodes(
+                        G_graph, pos_local,
+                        nodelist=route_node_ids,
+                        node_size=150,
+                        node_color=color,
+                        ax=ax_flow
+                    )
+                    # Etichette (opzionali) per i nodi del percorso
+                    labels = {
+                        n: G_graph.nodes[n].get("entity_name", f"node_{n}")
+                        for n in route_node_ids
+                    }
+                    nx.draw_networkx_labels(
+                        G_graph, pos_local,
+                        labels,
+                        font_size=9,
+                        ax=ax_flow,
+                        font_color="black"
                     )
     
-                    # Evidenziamo solo i nodi di tipo Corridoio con il colore della sequenza
-                    corridor_nodes_in_path = [
-                        n for n in route_node_ids
-                        if G_graph.nodes[n].get("tag") == "Corridoio"
-                    ]
-                    if corridor_nodes_in_path:
-                        nx.draw_networkx_nodes(
-                            G_graph, pos_local, nodelist=corridor_nodes_in_path,
-                            node_size=150, node_color=color, ax=ax_flow
-                        )
-                        # Facoltativo: etichette solo per i corridoi
-                        labels = {
-                            n: G_graph.nodes[n]["entity_name"]
-                            for n in corridor_nodes_in_path if "entity_name" in G_graph.nodes[n]
-                        }
-                        nx.draw_networkx_labels(G_graph, pos_local, labels,
-                                                font_size=9, ax=ax_flow, font_color="black")
+                df_flow_details.append({
+                    "Flussi": flusso,
+                    "Sequenza": seq,
+                    "Path": path_str,
+                    "Colore": color
+                })
     
-                    df_flow_details.append({
-                        "Flussi": flusso,
-                        "Sequenza": seq,
-                        "Path": path_str,
-                        "Colore": color
-                    })
-                else:
-                    st.warning(f"Path con nodi insufficienti: {path_str}")
-    
-            ax_flow.set_title("Flussi Selezionati (sfondo trasparente)")
+            # Titolo e assi off
+            ax_flow.set_title("Flussi Selezionati (sfondo + nodi colorati)")
             ax_flow.axis("off")
+    
+            # Creiamo la legenda personalizzata per le sequenze
+            legend_patches = []
+            import matplotlib.patches as mpatches
+            for seq_item in sorted(used_sequences):
+                patch = mpatches.Patch(
+                    color=sequence_color_map[seq_item],
+                    label=f"Sequenza: {seq_item}"
+                )
+                legend_patches.append(patch)
+            if legend_patches:
+                ax_flow.legend(
+                    handles=legend_patches,
+                    loc="upper left",
+                    title="Legenda Sequenze"
+                )
+    
             st.pyplot(fig_flow)
     
             # Mostriamo i dettagli in una tabella
             if df_flow_details:
                 st.subheader("Dettagli Flussi Selezionati")
                 st.dataframe(pd.DataFrame(df_flow_details))
-
 
 #############################################################################################
 if __name__ == "__main__":
