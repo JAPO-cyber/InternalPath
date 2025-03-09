@@ -155,10 +155,10 @@ def main():
     #df["Y"] = df["Y"].astype(str).str.replace(".", ",")
     #df["LenX"] = df["LenX"].astype(str).str.replace(".", ",")
     #df["LenY"] = df["LenY"].astype(str).str.replace(".", ",")
-    #df["X"] = pd.to_numeric(df["X"], errors="coerce")
-    #df["Y"] = pd.to_numeric(df["Y"], errors="coerce")
-    #df["LenX"] = pd.to_numeric(df["X"], errors="coerce")
-    #df["LenY"] = pd.to_numeric(df["Y"], errors="coerce")
+    df["X"] = pd.to_numeric(df["X"], errors="coerce")
+    df["Y"] = pd.to_numeric(df["Y"], errors="coerce")
+    df["LenX"] = pd.to_numeric(df["X"], errors="coerce")
+    df["LenY"] = pd.to_numeric(df["Y"], errors="coerce")
     
     
     st.subheader("Anteprima e modifica dei dati")
