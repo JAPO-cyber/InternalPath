@@ -134,7 +134,7 @@ def Creazione_G(tipologia_grafo, df_all, max_distance):
     return G
 
 def main():
-    st.title("Collegamento Macchine Tramite Corridoi – Calcolo di tutte le coppie")
+    st.title("Spaghetti Chart - Sito con Carriponte")
     
     uploaded_file = st.file_uploader("Carica file Excel (xls, xlsx) o CSV", type=["xls", "xlsx", "csv"])
     if not uploaded_file:
