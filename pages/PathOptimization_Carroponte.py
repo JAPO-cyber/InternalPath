@@ -387,7 +387,7 @@ def main():
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
     
-    # --------------------------
+# --------------------------
 # CARICAMENTO E VISUALIZZAZIONE FLUSSI DA EXCEL (con sfondo trasparente)
 # --------------------------
 st.subheader("Caricamento Excel Flussi")
@@ -440,8 +440,9 @@ if flow_file is not None:
         flow_graph_height = st.slider("Altezza del grafico (Flussi)", 6, 20, 6)
 
         # Creiamo una mappa da entity_name -> ID nodo (usiamo il grafo selezionato: G_graph)
-        # Se vuoi usare G o G_filter, sostituisci qui la variabile
-        mapping = {data["entity_name"]: node for node, data in G_graph.nodes(data=True)}
+        # Se un nodo non ha "entity_name", usiamo un valore di fallback "node_<id>"
+        mapping = { data.get("entity_name", f"node_{node}"): node 
+                    for node, data in G_graph.nodes(data=True) }
 
         # Posizioni dei nodi
         # (assumiamo tu abbia già definito pos = {node: (x, y) ...} per G_graph)
@@ -510,7 +511,7 @@ if flow_file is not None:
                     # Facoltativo: etichette solo per i corridoi
                     labels = {
                         n: G_graph.nodes[n]["entity_name"]
-                        for n in corridor_nodes_in_path
+                        for n in corridor_nodes_in_path if "entity_name" in G_graph.nodes[n]
                     }
                     nx.draw_networkx_labels(G_graph, pos_local, labels,
                                             font_size=9, ax=ax_flow, font_color="black")
@@ -532,6 +533,7 @@ if flow_file is not None:
         if df_flow_details:
             st.subheader("Dettagli Flussi Selezionati")
             st.dataframe(pd.DataFrame(df_flow_details))
+
 
 #############################################################################################
 if __name__ == "__main__":
