@@ -151,6 +151,11 @@ def main():
     df["Y"] = df["Y"].astype(str).str.replace(" m", "")
     df["LenX"] = df["LenX"].astype(str).str.replace(" m", "")
     df["LenY"] = df["LenY"].astype(str).str.replace(" m", "")
+    df["X"] = df["X"].astype(str).str.replace(".", ",")
+    df["Y"] = df["Y"].astype(str).str.replace(".", ",")
+    df["LenX"] = df["LenX"].astype(str).str.replace(".", ",")
+    df["LenY"] = df["LenY"].astype(str).str.replace(".", ",")
+    
     
     st.subheader("Anteprima e modifica dei dati")
     edited_data = st.data_editor(df[df.columns[:5]], num_rows="dynamic")
