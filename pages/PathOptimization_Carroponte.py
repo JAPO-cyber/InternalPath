@@ -145,22 +145,10 @@ def main():
         df = pd.read_csv(uploaded_file)
     else:
         df = pd.read_excel(uploaded_file)
-    
-    # Rimuovo " m" dalle colonne X e Y per evitare problemi di conversione
-    df["X"] = df["X"].astype(str).str.replace(" m", "")
-    df["Y"] = df["Y"].astype(str).str.replace(" m", "")
-    df["LenX"] = df["LenX"].astype(str).str.replace(" m", "")
-    df["LenY"] = df["LenY"].astype(str).str.replace(" m", "")
-    #df["X"] = df["X"].astype(str).str.replace(".", ",")
-    #df["Y"] = df["Y"].astype(str).str.replace(".", ",")
-    #df["LenX"] = df["LenX"].astype(str).str.replace(".", ",")
-    #df["LenY"] = df["LenY"].astype(str).str.replace(".", ",")
-    df["X"] = pd.to_numeric(df["X"], errors="coerce")
-    df["Y"] = pd.to_numeric(df["Y"], errors="coerce")
-    df["LenX"] = pd.to_numeric(df["X"], errors="coerce")
-    df["LenY"] = pd.to_numeric(df["Y"], errors="coerce")
-    
-    
+
+    for col in ["X", "Y", "LenX", "LenY"]:
+        df[col] = df[col].astype(str).str.replace(" m", "", regex=False).str.replace(",", ".").astype(float)
+       
     st.subheader("Anteprima e modifica dei dati")
     edited_data = st.data_editor(df[df.columns[:7]], num_rows="dynamic")
     df.update(edited_data)
