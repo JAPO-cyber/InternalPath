@@ -149,9 +149,11 @@ def main():
     # Rimuovo " m" dalle colonne X e Y per evitare problemi di conversione
     df["X"] = df["X"].astype(str).str.replace(" m", "")
     df["Y"] = df["Y"].astype(str).str.replace(" m", "")
+    df["LenX"] = df["LenX"].astype(str).str.replace(" m", "")
+    df["LenY"] = df["LenY"].astype(str).str.replace(" m", "")
     
     st.subheader("Anteprima e modifica dei dati")
-    edited_data = st.data_editor(df[['Entity Name', 'Size', 'URL']], num_rows="dynamic")
+    edited_data = st.data_editor(df[df.columns[:5]], num_rows="dynamic")
     df.update(edited_data)
     
     required_cols = ["X", "Y", "Tag", "Entity Name", "Size", "URL"]
