@@ -4,6 +4,7 @@ import networkx as nx
 import math
 import itertools
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import io
 import PIL.Image
 import numpy as np
