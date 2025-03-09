@@ -15,7 +15,7 @@ if uploaded_file is not None:
     # Scala del progetto
     st.subheader("Valore di scala del disegno")
     max_distance = st.slider("Scala per collegare i nodi", 
-                               min_value=0.0, max_value=20.0, value=5,
+                               min_value=0.0, max_value=20.0, value=5.0,
                                help="Il GeoJson viene scalato con questo valore per i calcolo dei parametri")
     # Rimuove " m", sostituisce la virgola con il punto e converte in float
     for col in ["X", "Y", "LenX", "LenY"]:
