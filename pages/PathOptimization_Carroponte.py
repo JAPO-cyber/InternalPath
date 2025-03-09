@@ -313,7 +313,7 @@ def main():
             fig, ax = plt.subplots(figsize=(8,6))
             nx.draw_networkx_nodes(G_graph, pos, node_size=50, node_color="lightgray", ax=ax)
             nx.draw_networkx_edges(G_graph, pos, edge_color="lightgray", ax=ax, arrows=False, alpha=0.4)
-            import matplotlib.patches as mpatches
+            
             legend_patches = []
             for idx, coll in enumerate(selected_collegamenti):
                 row = df_results[df_results["Collegamento Macchina"] == coll].iloc[0]
