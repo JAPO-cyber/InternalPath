@@ -388,124 +388,152 @@ def main():
     )
     
     # --------------------------
-    # CARICAMENTO E VISUALIZZAZIONE FLUSSI DA EXCEL
-    # --------------------------
-    st.subheader("Caricamento Excel Flussi")
-    
-    flow_file = st.file_uploader(
-        "Carica un file Excel o CSV con le colonne: Flussi, Path, Sequenza",
-        type=["xls", "xlsx", "csv"]
+# CARICAMENTO E VISUALIZZAZIONE FLUSSI DA EXCEL (con sfondo trasparente)
+# --------------------------
+st.subheader("Caricamento Excel Flussi")
+
+flow_file = st.file_uploader(
+    "Carica un file Excel o CSV con le colonne: Flussi, Path, Sequenza",
+    type=["xls", "xlsx", "csv"]
+)
+
+if flow_file is not None:
+    # Leggiamo il file in un DataFrame
+    if flow_file.name.lower().endswith('.csv'):
+        df_flows = pd.read_csv(flow_file)
+    else:
+        df_flows = pd.read_excel(flow_file)
+
+    # Verifichiamo che le colonne necessarie siano presenti
+    required_flows_cols = ["Flussi", "Path", "Sequenza"]
+    for col in required_flows_cols:
+        if col not in df_flows.columns:
+            st.error(f"Colonna '{col}' mancante nel file di flussi.")
+            st.stop()
+
+    st.write("Anteprima Flussi:")
+    st.dataframe(df_flows)
+
+    # Filtriamo per Flussi
+    flussi_unici = sorted(df_flows["Flussi"].unique())
+    selected_flussi = st.multiselect(
+        "Seleziona uno o più Flussi da visualizzare",
+        options=flussi_unici,
+        default=flussi_unici  # di default li selezioniamo tutti
     )
-    
-    if flow_file is not None:
-        # Leggiamo il file in un DataFrame
-        if flow_file.name.lower().endswith('.csv'):
-            df_flows = pd.read_csv(flow_file)
-        else:
-            df_flows = pd.read_excel(flow_file)
-    
-        # Verifichiamo che le colonne necessarie siano presenti
-        required_flows_cols = ["Flussi", "Path", "Sequenza"]
-        for col in required_flows_cols:
-            if col not in df_flows.columns:
-                st.error(f"Colonna '{col}' mancante nel file di flussi.")
-                st.stop()
-    
-        st.write("Anteprima Flussi:")
-        st.dataframe(df_flows)
-    
-        # Filtriamo per Flussi
-        flussi_unici = sorted(df_flows["Flussi"].unique())
-        selected_flussi = st.multiselect(
-            "Seleziona uno o più Flussi da visualizzare",
-            options=flussi_unici,
-            default=flussi_unici  # di default li selezioniamo tutti
-        )
-        df_filtered_flows = df_flows[df_flows["Flussi"].isin(selected_flussi)]
-    
-        # Filtriamo per Sequenza
-        sequenze_uniche = sorted(df_filtered_flows["Sequenza"].unique())
-        selected_sequenze = st.multiselect(
-            "Seleziona una o più Sequenze da visualizzare",
-            options=sequenze_uniche,
-            default=sequenze_uniche  # di default le selezioniamo tutte
-        )
-        df_filtered_flows = df_filtered_flows[df_filtered_flows["Sequenza"].isin(selected_sequenze)]
-    
-        if df_filtered_flows.empty:
-            st.warning("Non ci sono righe che corrispondono ai filtri selezionati.")
-        else:
-            # Dimensioni del grafico selezionabili
-            flow_graph_width = st.slider("Larghezza del grafico (Flussi)", 6, 20, 8)
-            flow_graph_height = st.slider("Altezza del grafico (Flussi)", 6, 20, 6)
-    
-            # Creiamo una mappa da entity_name -> ID nodo (usiamo il grafo G_graph)
-            mapping = {data["entity_name"]: node for node, data in G_graph.nodes(data=True)}
-    
-            # Lista di colori da assegnare ai percorsi
-            colors = ["red", "blue", "green", "orange", "purple",
-                      "brown", "pink", "gray", "cyan", "magenta"]
-    
-            # Creiamo la figura per i flussi
-            fig_flow, ax_flow = plt.subplots(figsize=(flow_graph_width, flow_graph_height))
-            
-            # (Opzionale) Disegno di sfondo del grafo completo in tonalità chiara
-            nx.draw_networkx_nodes(G_graph, pos, node_size=50, node_color="lightgray", ax=ax_flow)
-            nx.draw_networkx_edges(G_graph, pos, alpha=0.2, ax=ax_flow)
-    
-            # Per mostrare i dettagli a fine disegno
-            df_flow_details = []
-    
-            # Cicliamo sulle righe filtrate
-            for idx, row in df_filtered_flows.iterrows():
-                flusso = row["Flussi"]
-                path_str = row["Path"]
-                seq = row["Sequenza"]
-    
-                # Ricaviamo i nomi dei nodi dal path
-                route_nodes_names = [p.strip() for p in path_str.split("-->")]
-    
-                # Convertiamo i nomi in ID nodi
-                route_node_ids = []
-                for name in route_nodes_names:
-                    if name in mapping:
-                        route_node_ids.append(mapping[name])
-                    else:
-                        st.warning(f"Nome entità '{name}' non trovato nel grafo.")
-                
-                # Se abbiamo almeno due nodi, costruiamo gli archi
-                if len(route_node_ids) > 1:
-                    route_edges = [(route_node_ids[i], route_node_ids[i+1]) for i in range(len(route_node_ids)-1)]
-                    color = colors[idx % len(colors)]  # un colore per ogni riga
-                    
-                    # Disegniamo nodi e archi
-                    nx.draw_networkx_nodes(G_graph, pos, nodelist=route_node_ids, 
-                                           node_size=150, node_color=color, ax=ax_flow)
-                    nx.draw_networkx_edges(G_graph, pos, edgelist=route_edges, 
-                                           width=2, edge_color=color, ax=ax_flow)
-                    # Etichette (solo per i nodi di questo percorso)
-                    labels = {n: G_graph.nodes[n]["entity_name"] for n in route_node_ids}
-                    nx.draw_networkx_labels(G_graph, pos, labels, font_size=9, ax=ax_flow)
-                    
-                    df_flow_details.append({
-                        "Flussi": flusso,
-                        "Sequenza": seq,
-                        "Path": path_str,
-                        "Colore": color
-                    })
-                else:
-                    st.warning(f"Path con nodi insufficienti: {path_str}")
-    
-            ax_flow.set_title("Flussi Selezionati")
-            ax_flow.axis("off")
-            st.pyplot(fig_flow)
-    
-            # Mostriamo i dettagli in una tabella
-            if df_flow_details:
-                st.subheader("Dettagli Flussi Selezionati")
-                st.dataframe(pd.DataFrame(df_flow_details))
+    df_filtered_flows = df_flows[df_flows["Flussi"].isin(selected_flussi)]
 
+    # Filtriamo per Sequenza
+    sequenze_uniche = sorted(df_filtered_flows["Sequenza"].unique())
+    selected_sequenze = st.multiselect(
+        "Seleziona una o più Sequenze da visualizzare",
+        options=sequenze_uniche,
+        default=sequenze_uniche  # di default le selezioniamo tutte
+    )
+    df_filtered_flows = df_filtered_flows[df_filtered_flows["Sequenza"].isin(selected_sequenze)]
 
+    if df_filtered_flows.empty:
+        st.warning("Non ci sono righe che corrispondono ai filtri selezionati.")
+    else:
+        # Slider per dimensioni del grafico
+        flow_graph_width = st.slider("Larghezza del grafico (Flussi)", 6, 20, 8)
+        flow_graph_height = st.slider("Altezza del grafico (Flussi)", 6, 20, 6)
+
+        # Creiamo una mappa da entity_name -> ID nodo (usiamo il grafo selezionato: G_graph)
+        # Se vuoi usare G o G_filter, sostituisci qui la variabile
+        mapping = {data["entity_name"]: node for node, data in G_graph.nodes(data=True)}
+
+        # Posizioni dei nodi
+        # (assumiamo tu abbia già definito pos = {node: (x, y) ...} per G_graph)
+        pos_local = pos
+
+        # Prepariamo una lista di colori (riutilizzati in caso di sequenze numerose)
+        available_colors = [
+            "red", "blue", "green", "orange", "purple",
+            "brown", "pink", "gray", "cyan", "magenta"
+        ]
+        # Mappatura Sequenza -> Colore
+        sequence_color_map = {}
+
+        # Creiamo la figura con sfondo trasparente
+        fig_flow, ax_flow = plt.subplots(figsize=(flow_graph_width, flow_graph_height))
+        fig_flow.patch.set_facecolor('none')   # Sfondo figura trasparente
+        ax_flow.set_facecolor('none')          # Sfondo assi trasparente
+
+        # (Opzionale) Disegno di sfondo del grafo completo in tonalità chiara
+        nx.draw_networkx_nodes(G_graph, pos_local, node_size=50, node_color="lightgray", ax=ax_flow)
+        nx.draw_networkx_edges(G_graph, pos_local, alpha=0.2, ax=ax_flow)
+
+        # Per mostrare i dettagli a fine disegno
+        df_flow_details = []
+
+        # Cicliamo sulle righe filtrate
+        for idx, row in df_filtered_flows.iterrows():
+            flusso = row["Flussi"]
+            path_str = row["Path"]
+            seq = row["Sequenza"]
+
+            # Se la sequenza non è ancora nel dizionario, le assegniamo un colore
+            if seq not in sequence_color_map:
+                sequence_color_map[seq] = available_colors[len(sequence_color_map) % len(available_colors)]
+            color = sequence_color_map[seq]
+
+            # Ricaviamo i nomi dei nodi dal Path (es. "INGRESSO CAMP 2 --> BARE ORIZZONTALI")
+            route_nodes_names = [p.strip() for p in path_str.split("-->")]
+
+            # Convertiamo i nomi in ID nodi, filtrando quelli non trovati
+            route_node_ids = [mapping[name] for name in route_nodes_names if name in mapping]
+
+            # Se abbiamo almeno due nodi, costruiamo gli archi
+            if len(route_node_ids) > 1:
+                route_edges = [
+                    (route_node_ids[i], route_node_ids[i+1]) 
+                    for i in range(len(route_node_ids)-1)
+                ]
+
+                # Disegniamo gli archi del percorso con il colore della sequenza
+                nx.draw_networkx_edges(
+                    G_graph, pos_local, edgelist=route_edges,
+                    width=2, edge_color=color, ax=ax_flow
+                )
+
+                # Evidenziamo solo i nodi di tipo Corridoio con il colore della sequenza
+                corridor_nodes_in_path = [
+                    n for n in route_node_ids
+                    if G_graph.nodes[n].get("tag") == "Corridoio"
+                ]
+                if corridor_nodes_in_path:
+                    nx.draw_networkx_nodes(
+                        G_graph, pos_local, nodelist=corridor_nodes_in_path,
+                        node_size=150, node_color=color, ax=ax_flow
+                    )
+                    # Facoltativo: etichette solo per i corridoi
+                    labels = {
+                        n: G_graph.nodes[n]["entity_name"]
+                        for n in corridor_nodes_in_path
+                    }
+                    nx.draw_networkx_labels(G_graph, pos_local, labels,
+                                            font_size=9, ax=ax_flow, font_color="black")
+
+                df_flow_details.append({
+                    "Flussi": flusso,
+                    "Sequenza": seq,
+                    "Path": path_str,
+                    "Colore": color
+                })
+            else:
+                st.warning(f"Path con nodi insufficienti: {path_str}")
+
+        ax_flow.set_title("Flussi Selezionati (sfondo trasparente)")
+        ax_flow.axis("off")
+        st.pyplot(fig_flow)
+
+        # Mostriamo i dettagli in una tabella
+        if df_flow_details:
+            st.subheader("Dettagli Flussi Selezionati")
+            st.dataframe(pd.DataFrame(df_flow_details))
+
+#############################################################################################
 if __name__ == "__main__":
     main()
 
