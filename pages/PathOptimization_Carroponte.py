@@ -151,10 +151,14 @@ def main():
     df["Y"] = df["Y"].astype(str).str.replace(" m", "")
     df["LenX"] = df["LenX"].astype(str).str.replace(" m", "")
     df["LenY"] = df["LenY"].astype(str).str.replace(" m", "")
-    df["X"] = df["X"].astype(str).str.replace(".", ",")
-    df["Y"] = df["Y"].astype(str).str.replace(".", ",")
-    df["LenX"] = df["LenX"].astype(str).str.replace(".", ",")
-    df["LenY"] = df["LenY"].astype(str).str.replace(".", ",")
+    #df["X"] = df["X"].astype(str).str.replace(".", ",")
+    #df["Y"] = df["Y"].astype(str).str.replace(".", ",")
+    #df["LenX"] = df["LenX"].astype(str).str.replace(".", ",")
+    #df["LenY"] = df["LenY"].astype(str).str.replace(".", ",")
+    #df["X"] = pd.to_numeric(df["X"], errors="coerce")
+    #df["Y"] = pd.to_numeric(df["Y"], errors="coerce")
+    #df["LenX"] = pd.to_numeric(df["X"], errors="coerce")
+    #df["LenY"] = pd.to_numeric(df["Y"], errors="coerce")
     
     
     st.subheader("Anteprima e modifica dei dati")
@@ -166,10 +170,7 @@ def main():
             st.error(f"Colonna '{col}' mancante nel file.")
             return
 
-    df["X"] = pd.to_numeric(df["X"], errors="coerce")
-    df["Y"] = pd.to_numeric(df["Y"], errors="coerce")
-    df["LenX"] = pd.to_numeric(df["X"], errors="coerce")
-    df["LenY"] = pd.to_numeric(df["Y"], errors="coerce")
+    
     
     df_corridor = df[df["Tag"] == "Corridoio"].copy()
     df_machine = df[df["Tag"] == "Macchina"].copy()
