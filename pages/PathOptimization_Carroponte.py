@@ -73,7 +73,6 @@ def breakdown_path(path, pos):
         segments.append(d)
         total += d
     
-    # Mostriamo solo i segmenti, senza "= somma"
     detail_str = " + ".join(f"{seg:.5f}" for seg in segments)
     return detail_str, total
 
@@ -107,7 +106,6 @@ def Creazione_G(tipologia_grafo, df_all, max_distance):
         pos_i = (G.nodes[i]["x"], G.nodes[i]["y"])
         pos_j = (G.nodes[j]["x"], G.nodes[j]["y"])
         stream_j = G.nodes[j]["stream"]
-        # Calcolo della distanza euclidea
         dist = math.dist(pos_i, pos_j)
         if dist <= max_distance:
             if tipologia_grafo == "STD":
@@ -149,29 +147,32 @@ def main():
     # Scala del progetto
     st.subheader("Valore di scala del disegno")
     scala = st.slider("Scala per collegare i nodi", 
-                               min_value=0.0, max_value=200.0, value=158.3,
-                               help="Il GeoJson viene scalato con questo valore per i calcolo dei parametri")
-    # Rimuove " m", sostituisce la virgola con il punto e converte in float
+                      min_value=0.0, max_value=200.0, value=158.3,
+                      help="Il GeoJson viene scalato con questo valore per i calcolo dei parametri")
+    
+    # Rimuove " m", sostituisce la virgola con il punto e converte in float, moltiplicando per la scala
     for col in ["X", "Y", "LenX", "LenY"]:
-        df[col] = (df[col].astype(str).str.replace(" m", "", regex=False).str.replace(",", ".").astype(float)*scala)
+        df[col] = (df[col].astype(str)
+                   .str.replace(" m", "", regex=False)
+                   .str.replace(",", ".")
+                   .astype(float)
+                   * scala)
        
     st.subheader("Anteprima e modifica dei dati")
     edited_data = st.data_editor(df[df.columns[:7]], num_rows="dynamic")
     df.update(edited_data)
-    required_cols = ["X", "Y","LenX","LenY", "Tag", "Entity Name", "Size", "URL"]
+    required_cols = ["X", "Y", "LenX", "LenY", "Tag", "Entity Name", "Size", "URL"]
     for col in required_cols:
         if col not in df.columns:
             st.error(f"Colonna '{col}' mancante nel file.")
             return
 
-    
-    
     df_corridor = df[df["Tag"] == "Corridoio"].copy()
     df_machine = df[df["Tag"] == "Macchina"].copy()
-    df_aree_corridor= df[df["Tag"] == "Area Corridoio"].copy()
+    df_aree_corridor = df[df["Tag"] == "Area Corridoio"].copy()
 
     st.subheader("Download aree per macchine")
-    df_download_1=pd.concat([df_aree_corridor, df_machine])    
+    df_download_1 = pd.concat([df_aree_corridor, df_machine])
     towrite = io.BytesIO()
     with pd.ExcelWriter(towrite, engine='xlsxwriter') as writer:
         df_download_1.to_excel(writer, index=False, sheet_name='Aree')
@@ -189,18 +190,18 @@ def main():
     if df_machine.empty:
         st.warning("Nessuna macchina presente.")
         return
-    # Modifica del punto macchina da macchina a rettangolo
+
+    # Modifica del punto macchina: trasla X e Y per centrare il rettangolo
     df_machine['X'] = df_machine['X'] + df_machine['LenX'] / 2
     df_machine['Y'] = df_machine['Y'] + df_machine['LenY'] / 2
     df_all = pd.concat([df_corridor, df_machine])
 
-
-
     st.subheader("Costruzione del grafo")
     max_distance = st.slider("Distanza massima per collegare i nodi", 
-                               min_value=0.0, max_value=20.0, value=5.0,
-                               help="Due nodi vengono collegati se la distanza euclidea è ≤ a questo valore.")
+                             min_value=0.0, max_value=20.0, value=5.0,
+                             help="Due nodi vengono collegati se la distanza euclidea è ≤ a questo valore.")
     
+    # Costruzione di entrambi i grafi: uno "ottimale" e uno con filtro
     G = Creazione_G('STD', df_all, max_distance) 
     G_filter = Creazione_G('filter', df_all, max_distance)
     
@@ -241,7 +242,7 @@ def main():
     st.subheader("Calcolo dei percorsi per tutte le coppie di macchine")
     results = []
 
-    # Per semplificare la gestione, usiamo sempre G per calcolare l'elenco delle macchine
+    # Ordinamento dei nodi macchina per nome
     machine_nodes_sorted = sorted(
         [n for n, d in G.nodes(data=True) if d["tag"] == "Macchina"],
         key=lambda n: G.nodes[n]["entity_name"]
@@ -288,9 +289,7 @@ def main():
                 percorso_greedy = " --> ".join(G_filter.nodes[n]["entity_name"] for n in full_path_greedy)
                 length_greedy = total_greedy
                 
-                # --------------------------------------------------
                 # Calcolo campi per carroponte e carrello
-                # --------------------------------------------------
                 presa_carroponte = 0
                 componente_carroponte = ""
                 metri_carroponte = 0.0
@@ -302,14 +301,12 @@ def main():
                     current_node = full_path_greedy[i]
                     next_node = full_path_greedy[i+1]
                     
-                    # Se non siamo all'ultimo segmento e il nodo di destinazione non è un Corridoio, lo saltiamo
                     if i != len(full_path_greedy) - 2 and G.nodes[next_node]["tag"] != "Corridoio":
                         continue
                         
                     d = math.dist(pos[current_node], pos[next_node])
                     
                     if i == len(full_path_greedy) - 2 and G.nodes[next_node]["tag"] != "Corridoio":
-                        # Uso la lettera del nodo corrente (corridoio)
                         source_letter = G.nodes[current_node]["entity_name"].strip()[0].upper()
                         dest_letter = source_letter
                     else:
@@ -358,15 +355,14 @@ def main():
             componente_carrello = ""
             metri_carrello = ""
         
-        # Salviamo i risultati
         results.append({
             "Collegamento Macchina": collegamento,
             "Percorso Ottimale Seguito": percorso_ottimale,
-            "Dettaglio Distanze Ottimale": dettaglio_ottimale,  # "0.05 + 0.49 + 0.10"
-            "Lunghezza Totale Ottimale": length_euclid,         # 0.64
+            "Dettaglio Distanze Ottimale": dettaglio_ottimale,
+            "Lunghezza Totale Ottimale": length_euclid,
             "Percorso Vincolato Seguito": percorso_greedy,
-            "Dettaglio Distanze Vincolato": dettaglio_greedy,   # "0.05 + 0.49 + 0.10"
-            "Lunghezza Totale Vincolato": length_greedy,        # 0.64
+            "Dettaglio Distanze Vincolato": dettaglio_greedy,
+            "Lunghezza Totale Vincolato": length_greedy,
             "presa carroponte": presa_carroponte,
             "componente carroponte": componente_carroponte,
             "metri carroponte": metri_carroponte,
@@ -390,8 +386,60 @@ def main():
         file_name="risultati_percorsi.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+    
+    # --------------------------
+    # Visualizzazione interattiva del percorso selezionato
+    # --------------------------
+    st.subheader("Visualizzazione interattiva del percorso")
+    if not df_results.empty:
+        # Selezione del tipo di percorso da visualizzare
+        route_type = st.radio("Seleziona il tipo di percorso da visualizzare", options=["Ottimale", "Vincolato"], index=0)
+        # Selezione del collegamento (la coppia di macchine)
+        percorsi = df_results["Collegamento Macchina"].unique()
+        selected_route = st.selectbox("Seleziona un collegamento (percorso) da visualizzare", options=percorsi)
+        route_data = df_results[df_results["Collegamento Macchina"] == selected_route].iloc[0]
+        
+        if route_type == "Ottimale":
+            route_str = route_data["Percorso Ottimale Seguito"]
+            route_detail = route_data["Dettaglio Distanze Ottimale"]
+            route_length = route_data["Lunghezza Totale Ottimale"]
+            G_to_use = G
+        else:
+            route_str = route_data["Percorso Vincolato Seguito"]
+            route_detail = route_data["Dettaglio Distanze Vincolato"]
+            route_length = route_data["Lunghezza Totale Vincolato"]
+            G_to_use = G_filter
+
+        if route_str != "Nessun percorso":
+            # Dividiamo la stringa per ottenere i nomi (es. "Macchina A --> Corridoio 1 --> Macchina B")
+            route_nodes_names = [nome.strip() for nome in route_str.split("-->")]
+            # Creiamo la mappatura da entity_name a id nodo per il grafo scelto
+            mapping = {data["entity_name"]: node for node, data in G_to_use.nodes(data=True)}
+            route_node_ids = [mapping[nome] for nome in route_nodes_names if nome in mapping]
+            
+            if route_node_ids:
+                # Calcoliamo le posizioni usando il grafo scelto
+                pos_local = {node: (data["x"], data["y"]) for node, data in G_to_use.nodes(data=True)}
+                route_edges = [(route_node_ids[i], route_node_ids[i+1]) for i in range(len(route_node_ids)-1)]
+                
+                fig, ax = plt.subplots(figsize=(8, 6))
+                nx.draw_networkx_nodes(G_to_use, pos_local, nodelist=route_node_ids, node_size=150, node_color="orange", ax=ax)
+                nx.draw_networkx_edges(G_to_use, pos_local, edgelist=route_edges, width=2, edge_color="red", ax=ax)
+                labels = {node: G_to_use.nodes[node]["entity_name"] for node in route_node_ids}
+                nx.draw_networkx_labels(G_to_use, pos_local, labels, font_size=9, ax=ax)
+                ax.set_title("Percorso Selezionato: " + route_str)
+                ax.axis("off")
+                st.pyplot(fig)
+                
+                st.write("Dettaglio distanze:", route_detail)
+                st.write("Lunghezza totale:", route_length)
+            else:
+                st.error("Nessun nodo corrispondente trovato nel grafo per questo percorso.")
+        else:
+            st.warning("Il percorso selezionato non ha un percorso disponibile.")
 
 if __name__ == "__main__":
     main()
+
 
 
