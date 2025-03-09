@@ -191,7 +191,7 @@ def main():
         st.warning("Nessuna macchina presente.")
         return
 
-    # Modifica del punto macchina: trasla X e Y per centrare il rettangolo
+    # Traslazione per centrare il rettangolo delle macchine
     df_machine['X'] = df_machine['X'] + df_machine['LenX'] / 2
     df_machine['Y'] = df_machine['Y'] + df_machine['LenY'] / 2
     df_all = pd.concat([df_corridor, df_machine])
@@ -388,58 +388,98 @@ def main():
     )
     
     # --------------------------
-    # Visualizzazione interattiva del percorso selezionato
+    # Visualizzazione interattiva dei percorsi selezionati
     # --------------------------
-    st.subheader("Visualizzazione interattiva del percorso")
+    st.subheader("Visualizzazione interattiva dei percorsi")
     if not df_results.empty:
         # Selezione del tipo di percorso da visualizzare
         route_type = st.radio("Seleziona il tipo di percorso da visualizzare", options=["Ottimale", "Vincolato"], index=0)
-        # Selezione del collegamento (la coppia di macchine)
+        # Utilizzo del widget multiselect per scegliere più collegamenti
         percorsi = df_results["Collegamento Macchina"].unique()
-        selected_route = st.selectbox("Seleziona un collegamento (percorso) da visualizzare", options=percorsi)
-        route_data = df_results[df_results["Collegamento Macchina"] == selected_route].iloc[0]
+        selected_routes = st.multiselect("Seleziona uno o più collegamenti (percorsi) da visualizzare", options=percorsi, default=percorsi[0] if len(percorsi) > 0 else None)
         
-        if route_type == "Ottimale":
-            route_str = route_data["Percorso Ottimale Seguito"]
-            route_detail = route_data["Dettaglio Distanze Ottimale"]
-            route_length = route_data["Lunghezza Totale Ottimale"]
-            G_to_use = G
-        else:
-            route_str = route_data["Percorso Vincolato Seguito"]
-            route_detail = route_data["Dettaglio Distanze Vincolato"]
-            route_length = route_data["Lunghezza Totale Vincolato"]
-            G_to_use = G_filter
-
-        if route_str != "Nessun percorso":
-            # Dividiamo la stringa per ottenere i nomi (es. "Macchina A --> Corridoio 1 --> Macchina B")
-            route_nodes_names = [nome.strip() for nome in route_str.split("-->")]
-            # Creiamo la mappatura da entity_name a id nodo per il grafo scelto
-            mapping = {data["entity_name"]: node for node, data in G_to_use.nodes(data=True)}
-            route_node_ids = [mapping[nome] for nome in route_nodes_names if nome in mapping]
+        if selected_routes:
+            # Aggiungiamo due slider per modificare le dimensioni del grafico
+            graph_width = st.slider("Larghezza del grafico", min_value=6, max_value=20, value=8)
+            graph_height = st.slider("Altezza del grafico", min_value=6, max_value=20, value=6)
             
-            if route_node_ids:
-                # Calcoliamo le posizioni usando il grafo scelto
-                pos_local = {node: (data["x"], data["y"]) for node, data in G_to_use.nodes(data=True)}
-                route_edges = [(route_node_ids[i], route_node_ids[i+1]) for i in range(len(route_node_ids)-1)]
-                
-                fig, ax = plt.subplots(figsize=(8, 6))
-                nx.draw_networkx_nodes(G_to_use, pos_local, nodelist=route_node_ids, node_size=150, node_color="orange", ax=ax)
-                nx.draw_networkx_edges(G_to_use, pos_local, edgelist=route_edges, width=2, edge_color="red", ax=ax)
-                labels = {node: G_to_use.nodes[node]["entity_name"] for node in route_node_ids}
-                nx.draw_networkx_labels(G_to_use, pos_local, labels, font_size=9, ax=ax)
-                ax.set_title("Percorso Selezionato: " + route_str)
-                ax.axis("off")
-                st.pyplot(fig)
-                
-                st.write("Dettaglio distanze:", route_detail)
-                st.write("Lunghezza totale:", route_length)
+            if route_type == "Ottimale":
+                G_to_use = G
             else:
-                st.error("Nessun nodo corrispondente trovato nel grafo per questo percorso.")
+                G_to_use = G_filter
+            
+            # Mapping da entity_name a id nodo per il grafo scelto
+            mapping = {data["entity_name"]: node for node, data in G_to_use.nodes(data=True)}
+            pos_local = {node: (data["x"], data["y"]) for node, data in G_to_use.nodes(data=True)}
+            
+            # Lista di colori per distinguere i percorsi
+            colors = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'pink', 'gray']
+            
+            # Lista per salvare i dettagli dei percorsi selezionati
+            routes_details = []
+            
+            fig, ax = plt.subplots(figsize=(graph_width, graph_height))
+            # (Opzionale) Disegna lo sfondo con il grafo completo in tono chiaro
+            nx.draw_networkx_nodes(G_to_use, pos_local, node_size=50, node_color="lightgray", ax=ax)
+            nx.draw_networkx_edges(G_to_use, pos_local, alpha=0.2, ax=ax)
+            
+            for idx, route in enumerate(selected_routes):
+                # Seleziona il colore (ruota se necessario)
+                color = colors[idx % len(colors)]
+                
+                # Estrae la riga relativa al collegamento
+                route_data = df_results[df_results["Collegamento Macchina"] == route].iloc[0]
+                if route_type == "Ottimale":
+                    route_str = route_data["Percorso Ottimale Seguito"]
+                    route_detail = route_data["Dettaglio Distanze Ottimale"]
+                    route_length = route_data["Lunghezza Totale Ottimale"]
+                else:
+                    route_str = route_data["Percorso Vincolato Seguito"]
+                    route_detail = route_data["Dettaglio Distanze Vincolato"]
+                    route_length = route_data["Lunghezza Totale Vincolato"]
+                
+                if route_str != "Nessun percorso":
+                    # Divide la stringa per ottenere i nomi (es. "Macchina A --> Corridoio 1 --> Macchina B")
+                    route_nodes_names = [nome.strip() for nome in route_str.split("-->")]
+                    # Estrae gli id dei nodi corrispondenti
+                    route_node_ids = [mapping[nome] for nome in route_nodes_names if nome in mapping]
+                    
+                    if route_node_ids:
+                        # Costruisce gli archi consecutivi per il percorso
+                        route_edges = [(route_node_ids[i], route_node_ids[i+1]) for i in range(len(route_node_ids)-1)]
+                        # Disegna i nodi e gli archi del percorso con il colore scelto
+                        nx.draw_networkx_nodes(G_to_use, pos_local, nodelist=route_node_ids, node_size=150, node_color=color, ax=ax)
+                        nx.draw_networkx_edges(G_to_use, pos_local, edgelist=route_edges, width=2, edge_color=color, ax=ax)
+                        # Aggiunge le etichette solo per i nodi del percorso
+                        labels = {node: G_to_use.nodes[node]["entity_name"] for node in route_node_ids}
+                        nx.draw_networkx_labels(G_to_use, pos_local, labels, font_size=9, ax=ax)
+                        
+                        routes_details.append({
+                            "Collegamento": route,
+                            "Percorso": route_str,
+                            "Dettaglio distanze": route_detail,
+                            "Lunghezza totale": route_length,
+                            "Colore": color
+                        })
+                    else:
+                        st.error(f"Nessun nodo corrispondente trovato per il percorso {route}.")
+                else:
+                    st.warning(f"Il percorso selezionato '{route}' non ha un percorso disponibile.")
+            
+            ax.set_title("Percorsi selezionati")
+            ax.axis("off")
+            st.pyplot(fig)
+            
+            if routes_details:
+                st.subheader("Dettagli dei percorsi selezionati")
+                df_routes_details = pd.DataFrame(routes_details)
+                st.dataframe(df_routes_details)
         else:
-            st.warning("Il percorso selezionato non ha un percorso disponibile.")
+            st.info("Seleziona almeno un percorso da visualizzare.")
 
 if __name__ == "__main__":
     main()
+
 
 
 
