@@ -14,6 +14,13 @@ if uploaded_file is not None:
     # Rimuove " m", sostituisce la virgola con il punto e converte in float
     for col in ["X", "Y", "LenX", "LenY"]:
         df[col] = df[col].astype(str).str.replace(" m", "", regex=False).str.replace(",", ".").astype(float)
+
+    # Scala del progetto
+    st.subheader("Valore di scala del disegno")
+    max_distance = st.slider("Scala per collegare i nodi", 
+                               min_value=0.0, max_value=20.0, value=5,
+                               help="Il GeoJson viene scalato con questo valore per i calcolo dei parametri")
+    
     
     # 2. Filtra le righe in cui "Definition Name" è "Macchina" e calcola i vertici del quadrato
     df_macchina = df[df["Definition Name"] == "Macchina"].copy()
