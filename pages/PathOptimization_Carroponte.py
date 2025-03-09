@@ -146,8 +146,14 @@ def main():
     else:
         df = pd.read_excel(uploaded_file)
 
+    # Scala del progetto
+    st.subheader("Valore di scala del disegno")
+    scala = st.slider("Scala per collegare i nodi", 
+                               min_value=0.0, max_value=200.0, value=158.3,
+                               help="Il GeoJson viene scalato con questo valore per i calcolo dei parametri")
+    # Rimuove " m", sostituisce la virgola con il punto e converte in float
     for col in ["X", "Y", "LenX", "LenY"]:
-        df[col] = df[col].astype(str).str.replace(" m", "", regex=False).str.replace(",", ".").astype(float)
+        df[col] = (df[col].astype(str).str.replace(" m", "", regex=False).str.replace(",", ".").astype(float)*scala)
        
     st.subheader("Anteprima e modifica dei dati")
     edited_data = st.data_editor(df[df.columns[:7]], num_rows="dynamic")
