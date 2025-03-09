@@ -198,7 +198,7 @@ def main():
 
     st.subheader("Costruzione del grafo")
     max_distance = st.slider("Distanza massima per collegare i nodi", 
-                               min_value=0.0, max_value=1.0, value=0.5,
+                               min_value=0.0, max_value=20.0, value=5.0,
                                help="Due nodi vengono collegati se la distanza euclidea è ≤ a questo valore.")
     
     G = Creazione_G('STD', df_all, max_distance) 
