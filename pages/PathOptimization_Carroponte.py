@@ -162,7 +162,7 @@ def main():
     
     
     st.subheader("Anteprima e modifica dei dati")
-    edited_data = st.data_editor(df[df.columns[:5]], num_rows="dynamic")
+    edited_data = st.data_editor(df[df.columns[:7]], num_rows="dynamic")
     df.update(edited_data)
     required_cols = ["X", "Y","LenX","LenY", "Tag", "Entity Name", "Size", "URL"]
     for col in required_cols:
