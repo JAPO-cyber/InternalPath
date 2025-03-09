@@ -169,6 +169,20 @@ def main():
     df_corridor = df[df["Tag"] == "Corridoio"].copy()
     df_machine = df[df["Tag"] == "Macchina"].copy()
     df_aree_corridor= df[df["Tag"] == "Area Corridoio"].copy()
+
+    st.subheader("Download aree per macchine")
+    df_download_1=pd.concat([df_aree_corridor, df_machine])    
+    towrite = io.BytesIO()
+    with pd.ExcelWriter(towrite, engine='xlsxwriter') as writer:
+        df_results.to_excel(writer, index=False, sheet_name='Risultati')
+    towrite.seek(0)
+    st.download_button(
+        label="Scarica file Excel",
+        data=towrite,
+        file_name="aree e corridoi.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
     
     if df_corridor.empty:
         st.warning("Nessun corridoio presente. Impossibile costruire il grafo.")
@@ -180,6 +194,8 @@ def main():
     df_machine['X'] = df_machine['X'] + df_machine['LenX'] / 2
     df_machine['Y'] = df_machine['Y'] + df_machine['LenY'] / 2
     df_all = pd.concat([df_corridor, df_machine])
+
+
 
     st.subheader("Costruzione del grafo")
     max_distance = st.slider("Distanza massima per collegare i nodi", 
