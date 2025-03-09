@@ -83,7 +83,7 @@ def Creazione_G(tipologia_grafo, df_all, max_distance):
                    entity_name=row["Entity Name"], 
                    size=row["Size"],
                    stream=row["URL"])
-    # Connessione fra Corridoi
+    # Connessione fra Corridoi:
     corridor_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Corridoio"] 
     for i, j in itertools.permutations(corridor_nodes, 2):
         entity_i = G.nodes[i]["entity_name"]
@@ -99,7 +99,7 @@ def Creazione_G(tipologia_grafo, df_all, max_distance):
             else:
                 if is_valid_direction_filter(entity_i, entity_j, pos_i, pos_j, G.nodes[i]["size"], G.nodes[i]["stream"], stream_j):
                     G.add_edge(i, j, weight=dist)
-    # Connessione Macchina -> Corridoio
+    # Connessione Macchina -> Corridoio:
     machine_nodes = [n for n, d in G.nodes(data=True) if d["tag"] == "Macchina"]
     for machine in machine_nodes:
         machine_pos = (G.nodes[machine]["x"], G.nodes[machine]["y"])
@@ -116,7 +116,7 @@ def Creazione_G(tipologia_grafo, df_all, max_distance):
             G.add_edge(best_corridor, machine, weight=best_dist)
     return G
 
-# --- PARTE PRINCIPALE ---
+# --- PARTE PRINCIPALE DELLA APP ---
 
 def main():
     st.title("Spaghetti Chart - Sito con Carriponte")
@@ -213,7 +213,7 @@ def main():
     st.subheader("Grafico dei Nodi")
     display_graph(G_graph, pos, corridors, machines)
     
-    # Calcolo percorsi per coppie di macchine (df_results)
+    # Calcolo dei percorsi per tutte le coppie di macchine (df_results)
     st.subheader("Calcolo dei percorsi per tutte le coppie di macchine")
     results = []
     machine_nodes_sorted = sorted(
@@ -285,19 +285,10 @@ def main():
         file_name="risultati_percorsi.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-#########################################################################################################################################################    
-    # --- Sezione finale: Visualizzazione dei percorsi
-
-    if "excel_loaded" not in st.session_state:
-        st.session_state["excel_loaded"] = False
     
-    # Tasto per attivare la sezione di caricamento Excel
-    if st.button("Carica e visualizza Excel Flussi"):
-        st.session_state["excel_loaded"] = True
-    
-    # Se il tasto è stato premuto (cioè excel_loaded è True), mostra il file uploader e il relativo processing
-    if st.session_state["excel_loaded"]:
-        st.subheader("Visualizzazione dei percorsi dal file Excel")
+    # --- Sezione finale: Visualizzazione dei percorsi da Excel ---
+    st.subheader("Visualizzazione dei percorsi dal file Excel")
+    if st.button("Carica e visualizza Excel Flussi", key="btn_excel"):
         flussi_file = st.file_uploader(
             "Carica un file Excel o CSV con le colonne: Flussi, Path, Sequenza",
             type=["xls", "xlsx", "csv"],
@@ -305,45 +296,41 @@ def main():
         )
         if flussi_file is not None:
             if flussi_file.name.lower().endswith("csv"):
-                df_excel = pd.read_csv(flussi_file)
+                df_flussi = pd.read_csv(flussi_file)
             else:
-                df_excel = pd.read_excel(flussi_file)
-            st.write("Anteprima del file Excel:")
-            st.dataframe(df_excel)
+                df_flussi = pd.read_excel(flussi_file)
+            st.write("Anteprima dei flussi:")
+            st.dataframe(df_flussi)
             
-            # Primo filtro: in base alla colonna "Flussi"
-            flussi_options = sorted(df_excel["Flussi"].unique())
+            # Primo filtro: seleziona i valori della colonna "Flussi"
+            flussi_options = sorted(df_flussi["Flussi"].unique())
             selected_flussi = st.multiselect(
                 "Seleziona il valore (o i valori) per 'Flussi':",
                 options=flussi_options,
                 default=flussi_options
             )
-            df_filtered = df_excel[df_excel["Flussi"].isin(selected_flussi)]
+            df_filtered_flussi = df_flussi[df_flussi["Flussi"].isin(selected_flussi)]
             
-            # Estrai i percorsi (colonna "Path") dal dataframe filtrato
-            path_options = sorted(df_filtered["Path"].unique())
+            # Estrai i percorsi dalla colonna "Path" (il filtro "Path" sostituisce la selezione dei collegamenti)
+            path_options = sorted(df_filtered_flussi["Path"].unique())
             selected_paths = st.multiselect(
                 "Seleziona i percorsi da visualizzare (dal campo 'Path'):",
                 options=path_options,
-                default=path_options[:1]  # Puoi modificare il default come preferisci
+                default=path_options[:1]
             )
             
-            if df_filtered.empty or not selected_paths:
+            if df_filtered_flussi.empty or not selected_paths:
                 st.warning("Non ci sono righe corrispondenti ai filtri selezionati.")
             else:
-                # Imposta le dimensioni del grafico
-                graph_width = st.slider("Larghezza del grafico", 6, 20, 8, key="graph_width_flussi")
-                graph_height = st.slider("Altezza del grafico", 6, 20, 6, key="graph_height_flussi")
-                
-                # Carica un'immagine di sfondo (opzionale)
-                bg_file = st.file_uploader("Carica un'immagine di sfondo (opzionale)", type=["png", "jpg", "jpeg"], key="bg_file_flussi")
+                graph_width = st.slider("Larghezza del grafico", 6, 20, 8, key="graph_width_excel")
+                graph_height = st.slider("Altezza del grafico", 6, 20, 6, key="graph_height_excel")
+                bg_file = st.file_uploader("Carica un'immagine di sfondo (opzionale)", type=["png", "jpg", "jpeg"], key="bg_file_excel")
                 bg_image = None
                 if bg_file is not None:
                     pil_img = PIL.Image.open(bg_file)
                     bg_image = np.array(pil_img)
                 
-                # Si assume che G_graph e pos siano già definiti (grafo e dizionario delle posizioni)
-                # Creiamo un mapping: entity_name -> ID nodo (per convertire i nomi in ID)
+                # Usiamo il medesimo grafo e mapping
                 mapping = {
                     data.get("entity_name", f"node_{node}"): node
                     for node, data in G_graph.nodes(data=True)
@@ -355,49 +342,47 @@ def main():
                 min_y, max_y = min(ys), max(ys)
                 
                 available_colors = ["red", "blue", "green", "orange", "purple", "brown", "pink", "gray", "cyan", "magenta"]
-                sequence_color_map = {}  # se necessario, qui non viene usata per il filtro ma potresti usarla per altre info
-                
-                fig_flussi, ax_flussi = plt.subplots(figsize=(graph_width, graph_height))
-                fig_flussi.patch.set_facecolor('none')
-                ax_flussi.set_facecolor('none')
-                
+                fig_excel, ax_excel = plt.subplots(figsize=(graph_width, graph_height))
+                fig_excel.patch.set_facecolor('none')
+                ax_excel.set_facecolor('none')
                 if bg_image is not None:
-                    ax_flussi.imshow(bg_image, extent=(min_x, max_x, min_y, max_y), zorder=0, aspect='auto')
-                
-                # Disegniamo l'intero grafo in grigio chiaro per contesto
-                nx.draw_networkx_nodes(G_graph, pos_local, node_size=50, node_color="lightgray", ax=ax_flussi)
-                nx.draw_networkx_edges(G_graph, pos_local, edge_color="lightgray", ax=ax_flussi, arrows=False, alpha=0.5)
+                    ax_excel.imshow(bg_image, extent=(min_x, max_x, min_y, max_y), zorder=0, aspect='auto')
+                nx.draw_networkx_nodes(G_graph, pos_local, node_size=50, node_color="lightgray", ax=ax_excel)
+                nx.draw_networkx_edges(G_graph, pos_local, edge_color="lightgray", ax=ax_excel, arrows=False, alpha=0.5)
                 
                 import matplotlib.patches as mpatches
                 legend_patches = []
                 for idx, path_str in enumerate(selected_paths):
-                    # Il campo "Path" contiene i nomi dei nodi separati da " --> "
                     route_names = [p.strip() for p in path_str.split("-->")]
                     route_ids = [mapping[name] for name in route_names if name in mapping]
                     route_edges = [(route_ids[i], route_ids[i+1]) for i in range(len(route_ids)-1)]
                     color = available_colors[idx % len(available_colors)]
                     if route_edges:
-                        nx.draw_networkx_edges(G_graph, pos_local, edgelist=route_edges, width=2, edge_color=color, ax=ax_flussi, arrows=False)
+                        nx.draw_networkx_edges(G_graph, pos_local,
+                                               edgelist=route_edges,
+                                               width=2,
+                                               edge_color=color,
+                                               ax=ax_excel,
+                                               arrows=False)
                     if route_ids:
-                        nx.draw_networkx_nodes(G_graph, pos_local, nodelist=route_ids, node_size=150, node_color=color, ax=ax_flussi)
+                        nx.draw_networkx_nodes(G_graph, pos_local,
+                                               nodelist=route_ids,
+                                               node_size=150,
+                                               node_color=color,
+                                               ax=ax_excel)
                         labels = {nid: G_graph.nodes[nid].get("entity_name", f"node_{nid}") for nid in route_ids}
-                        nx.draw_networkx_labels(G_graph, pos_local, labels, font_size=9, ax=ax_flussi, font_color="black")
-                    legend_patches.append(mpatches.Patch(color=color, label=f"Path: {path_str}"))
+                        nx.draw_networkx_labels(G_graph, pos_local, labels, font_size=9, ax=ax_excel, font_color="black")
+                    legend_patches.append(mpatches.Patch(color=color, label=f"Flussi: {path_str}"))
                 
-                ax_flussi.set_title("Percorsi filtrati per 'Flussi' (usando 'Path')")
-                ax_flussi.axis("off")
+                ax_excel.set_title("Percorsi dal file Excel (filtrati per 'Flussi')")
+                ax_excel.axis("off")
                 if legend_patches:
-                    ax_flussi.legend(handles=legend_patches, loc="upper left", title="Legenda")
-                st.pyplot(fig_flussi)
-                
+                    ax_excel.legend(handles=legend_patches, loc="upper left", title="Legenda")
+                st.pyplot(fig_excel)
                 st.subheader("Dettagli dei flussi filtrati")
-                st.dataframe(df_filtered)
-
+                st.dataframe(df_filtered_flussi)
 
 if __name__ == "__main__":
     main()
-
-
-
 
 
