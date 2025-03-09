@@ -176,9 +176,11 @@ def main():
     if df_machine.empty:
         st.warning("Nessuna macchina presente.")
         return
-    
+    # Modifica del punto macchina da macchina a rettangolo
+    df_machine['X'] = df_machine['X'] + df_machine['LenX'] / 2
+    df_machine['Y'] = df_machine['Y'] + df_machine['LenY'] / 2
     df_all = pd.concat([df_corridor, df_machine])
-    
+
     st.subheader("Costruzione del grafo")
     max_distance = st.slider("Distanza massima per collegare i nodi", 
                                min_value=0.0, max_value=1.0, value=0.5,
