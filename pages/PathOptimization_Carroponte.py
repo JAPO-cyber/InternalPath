@@ -157,10 +157,11 @@ def main():
 
     df_corridor = df[df["Tag"] == "Corridoio"].copy()
     df_machine = df[df["Tag"] == "Macchina"].copy()
+    df_machine_square = df[df["Tag"] == "Macchina_1"].copy()
     df_aree_corridor = df[df["Tag"] == "Area Corridoio"].copy()
 
     st.subheader("Download aree per macchine")
-    df_download_1 = pd.concat([df_aree_corridor, df_machine])
+    df_download_1 = pd.concat([df_aree_corridor, df_machine_square])
     towrite = io.BytesIO()
     with pd.ExcelWriter(towrite, engine='xlsxwriter') as writer:
         df_download_1.to_excel(writer, index=False, sheet_name='Aree')
