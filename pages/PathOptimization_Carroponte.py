@@ -373,7 +373,7 @@ def main():
                 key="excel_selected_sequenze"
             )
             df_filtered_excel = df_filtered_excel[df_filtered_excel["Sequenza"].isin(selected_sequenze_excel)]
-            collegamenti_disponibili = df_filtered_excel ["Sequenza"].unique()
+            selected_collegamenti = df_filtered_excel ["Sequenza"].unique()
 
             
             if selected_collegamenti:
