@@ -386,7 +386,11 @@ def main():
                 
                 legend_patches = []
                 for idx, coll in enumerate(selected_collegamenti):
-                    row = df_results[df_results["Collegamento Macchina"] == coll].iloc[0]
+                    filtered_rows = df_results[df_results["Collegamento Macchina"] == coll]
+                    if filtered_rows.empty:
+                        st.warning(f"Nessun record trovato per il collegamento {coll}.")
+                        continue
+                    row = filtered_rows.iloc[0]
                     if percorso_type == "Ottimale":
                         path_str = row["Percorso Ottimale Seguito"]
                     else:
