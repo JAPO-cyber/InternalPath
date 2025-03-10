@@ -310,6 +310,10 @@ def main():
         key="bg_image"
     )
     
+    # (Opzionale) Mostra l'immagine caricata per verificare il caricamento
+    if bg_image_file:
+        st.image(bg_image_file, caption="Immagine di sfondo caricata", use_column_width=True)
+    
     if vis_mode == "Percorsi calcolati (df_results)":
         collegamenti_disponibili = df_results["Collegamento Macchina"].unique()
         selected_collegamenti = st.multiselect(
@@ -323,11 +327,12 @@ def main():
             mapping = { data.get("entity_name", f"node_{node}"): node 
                         for node, data in G_graph.nodes(data=True) }
             fig, ax = plt.subplots(figsize=(8,6))
-            # Se è stata caricata un'immagine di sfondo, la mostriamo prima degli altri elementi
-            if bg_image_file is not None:
+            # Se l'immagine di sfondo è stata caricata, caricala e visualizzala
+            if bg_image_file:
                 from PIL import Image
                 import numpy as np
-                bg_image = Image.open(bg_image_file)
+                bg_image_file.seek(0)  # Riavvia il puntatore del file
+                bg_image = Image.open(bg_image_file).convert("RGB")
                 bg_image_array = np.array(bg_image)
                 # Calcola l'estensione in base alle coordinate dei nodi
                 x_coords = [coord[0] for coord in pos.values()]
@@ -403,11 +408,11 @@ def main():
                 mapping = { data.get("entity_name", f"node_{node}"): node 
                             for node, data in G_graph.nodes(data=True) }
                 fig, ax = plt.subplots(figsize=(8,6))
-                # Se è stata caricata un'immagine di sfondo, la mostriamo
-                if bg_image_file is not None:
+                if bg_image_file:
                     from PIL import Image
                     import numpy as np
-                    bg_image = Image.open(bg_image_file)
+                    bg_image_file.seek(0)
+                    bg_image = Image.open(bg_image_file).convert("RGB")
                     bg_image_array = np.array(bg_image)
                     x_coords = [coord[0] for coord in pos.values()]
                     y_coords = [coord[1] for coord in pos.values()]
