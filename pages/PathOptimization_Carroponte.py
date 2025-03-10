@@ -287,18 +287,28 @@ def main():
     )
     #############################################################################################################################################################################################
     ############################################################################################################################################################################################
+
     # --- Sezione finale: Visualizzazione dei percorsi
     st.subheader("Visualizzazione dei percorsi calcolati")
     percorso_type = st.radio(
-            "Scegli quale percorso visualizzare:",
-            ("Ottimale", "Vincolato"),
-            index=0,
-            key="percorsi_type"
-        )
-
+        "Scegli quale percorso visualizzare:",
+        ("Ottimale", "Vincolato"),
+        index=0,
+        key="percorsi_type"
+    )
+    
     st.subheader("Visualizzazione dei percorsi")
-    vis_mode = st.radio("Scegli la modalità di visualizzazione dei percorsi:", 
-                        ("Percorsi calcolati (df_results)", "Percorsi da Excel"), index=0)
+    vis_mode = st.radio(
+        "Scegli la modalità di visualizzazione dei percorsi:", 
+        ("Percorsi calcolati (df_results)", "Percorsi da Excel"), index=0
+    )
+    
+    # Carica un'immagine di sfondo opzionale
+    bg_image_file = st.file_uploader(
+        "Carica un'immagine di sfondo (opzionale)", 
+        type=["png", "jpg", "jpeg"], 
+        key="bg_image"
+    )
     
     if vis_mode == "Percorsi calcolati (df_results)":
         collegamenti_disponibili = df_results["Collegamento Macchina"].unique()
@@ -313,8 +323,20 @@ def main():
             mapping = { data.get("entity_name", f"node_{node}"): node 
                         for node, data in G_graph.nodes(data=True) }
             fig, ax = plt.subplots(figsize=(8,6))
-            nx.draw_networkx_nodes(G_graph, pos, node_size=50, node_color="lightgray", ax=ax)
-            nx.draw_networkx_edges(G_graph, pos, edge_color="lightgray", ax=ax, arrows=False, alpha=0.4)
+            # Se è stata caricata un'immagine di sfondo, la mostriamo prima degli altri elementi
+            if bg_image_file is not None:
+                from PIL import Image
+                import numpy as np
+                bg_image = Image.open(bg_image_file)
+                bg_image_array = np.array(bg_image)
+                # Calcola l'estensione in base alle coordinate dei nodi
+                x_coords = [coord[0] for coord in pos.values()]
+                y_coords = [coord[1] for coord in pos.values()]
+                x_min, x_max = min(x_coords), max(x_coords)
+                y_min, y_max = min(y_coords), max(y_coords)
+                ax.imshow(bg_image_array, extent=(x_min, x_max, y_min, y_max), zorder=0)
+            nx.draw_networkx_nodes(G_graph, pos, node_size=50, node_color="lightgray", ax=ax, zorder=2)
+            nx.draw_networkx_edges(G_graph, pos, edge_color="lightgray", ax=ax, arrows=False, alpha=0.4, zorder=1)
             
             legend_patches = []
             for idx, coll in enumerate(selected_collegamenti):
@@ -330,10 +352,10 @@ def main():
                 route_node_ids = [mapping[n] for n in route_names if n in mapping]
                 route_edges = [(route_node_ids[i], route_node_ids[i+1]) for i in range(len(route_node_ids)-1)]
                 color = available_colors[idx % len(available_colors)]
-                nx.draw_networkx_edges(G_graph, pos, edgelist=route_edges, width=2, edge_color=color, ax=ax, arrows=False)
-                nx.draw_networkx_nodes(G_graph, pos, nodelist=route_node_ids, node_color=color, node_size=150, ax=ax)
+                nx.draw_networkx_edges(G_graph, pos, edgelist=route_edges, width=2, edge_color=color, ax=ax, arrows=False, zorder=3)
+                nx.draw_networkx_nodes(G_graph, pos, nodelist=route_node_ids, node_color=color, node_size=150, ax=ax, zorder=4)
                 labels = {nid: G_graph.nodes[nid].get("entity_name", f"node_{nid}") for nid in route_node_ids}
-                nx.draw_networkx_labels(G_graph, pos, labels, font_color="black", font_size=9, ax=ax)
+                nx.draw_networkx_labels(G_graph, pos, labels, font_color="black", font_size=9, ax=ax, zorder=5)
                 legend_patches.append(mpatches.Patch(color=color, label=f"{coll} ({percorso_type})"))
             ax.set_title(f"Percorsi {percorso_type} Selezionati (inclusi i corridoi)")
             ax.axis("off")
@@ -381,8 +403,19 @@ def main():
                 mapping = { data.get("entity_name", f"node_{node}"): node 
                             for node, data in G_graph.nodes(data=True) }
                 fig, ax = plt.subplots(figsize=(8,6))
-                nx.draw_networkx_nodes(G_graph, pos, node_size=50, node_color="lightgray", ax=ax)
-                nx.draw_networkx_edges(G_graph, pos, edge_color="lightgray", ax=ax, arrows=False, alpha=0.4)
+                # Se è stata caricata un'immagine di sfondo, la mostriamo
+                if bg_image_file is not None:
+                    from PIL import Image
+                    import numpy as np
+                    bg_image = Image.open(bg_image_file)
+                    bg_image_array = np.array(bg_image)
+                    x_coords = [coord[0] for coord in pos.values()]
+                    y_coords = [coord[1] for coord in pos.values()]
+                    x_min, x_max = min(x_coords), max(x_coords)
+                    y_min, y_max = min(y_coords), max(y_coords)
+                    ax.imshow(bg_image_array, extent=(x_min, x_max, y_min, y_max), zorder=0)
+                nx.draw_networkx_nodes(G_graph, pos, node_size=50, node_color="lightgray", ax=ax, zorder=2)
+                nx.draw_networkx_edges(G_graph, pos, edge_color="lightgray", ax=ax, arrows=False, alpha=0.4, zorder=1)
                 
                 legend_patches = []
                 for idx, coll in enumerate(selected_collegamenti):
@@ -402,10 +435,10 @@ def main():
                     route_node_ids = [mapping[n] for n in route_names if n in mapping]
                     route_edges = [(route_node_ids[i], route_node_ids[i+1]) for i in range(len(route_node_ids)-1)]
                     color = available_colors[idx % len(available_colors)]
-                    nx.draw_networkx_edges(G_graph, pos, edgelist=route_edges, width=2, edge_color=color, ax=ax, arrows=False)
-                    nx.draw_networkx_nodes(G_graph, pos, nodelist=route_node_ids, node_color=color, node_size=150, ax=ax)
+                    nx.draw_networkx_edges(G_graph, pos, edgelist=route_edges, width=2, edge_color=color, ax=ax, arrows=False, zorder=3)
+                    nx.draw_networkx_nodes(G_graph, pos, nodelist=route_node_ids, node_color=color, node_size=150, ax=ax, zorder=4)
                     labels = {nid: G_graph.nodes[nid].get("entity_name", f"node_{nid}") for nid in route_node_ids}
-                    nx.draw_networkx_labels(G_graph, pos, labels, font_color="black", font_size=9, ax=ax)
+                    nx.draw_networkx_labels(G_graph, pos, labels, font_color="black", font_size=9, ax=ax, zorder=5)
                     legend_patches.append(mpatches.Patch(color=color, label=f"{coll} ({percorso_type})"))
                 ax.set_title(f"Percorsi {percorso_type} Selezionati (inclusi i corridoi)")
                 ax.axis("off")
@@ -415,8 +448,7 @@ def main():
                         unique_patches[p.get_label()] = p
                     ax.legend(handles=list(unique_patches.values()), loc="upper left", title="Legenda Percorsi")
                 st.pyplot(fig)
-
-
+                
 if __name__ == "__main__":
     main()
 
