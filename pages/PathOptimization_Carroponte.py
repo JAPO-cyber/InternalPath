@@ -366,15 +366,15 @@ def main():
             df_filtered_excel = df_flussi_excel[df_flussi_excel["Flussi"].isin(selected_flussi_excel)]
             
             sequenze_options = sorted(df_filtered_excel["Path"].unique())
-            selected_sequenze_excel = st.multiselect(
+            selected_collegamenti = st.multiselect(
                 "Seleziona le sequenze da visualizzare",
                 options=sequenze_options,
                 default=sequenze_options,
                 key="excel_selected_sequenze"
             )
-            df_filtered_excel = df_filtered_excel[df_filtered_excel["Path"].isin(selected_sequenze_excel)]
+            df_filtered_excel = df_filtered_excel[df_filtered_excel["Path"].isin(selected_collegamenti)]
         
-            if selected_sequenze_excel:
+            if selected_collegamenti:
                 available_colors = ["red", "blue", "green", "orange", "purple", "brown", "pink", "gray", "cyan", "magenta"]
                 mapping = { data.get("entity_name", f"node_{node}"): node 
                             for node, data in G_graph.nodes(data=True) }
