@@ -285,10 +285,11 @@ def main():
         file_name="risultati_percorsi.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
-    
+    #############################################################################################################################################################################################
+    ############################################################################################################################################################################################
     # --- Sezione finale: Visualizzazione dei percorsi
     st.subheader("Visualizzazione dei percorsi calcolati")
-        percorso_type = st.radio(
+    percorso_type = st.radio(
             "Scegli quale percorso visualizzare:",
             ("Ottimale", "Vincolato"),
             index=0,
