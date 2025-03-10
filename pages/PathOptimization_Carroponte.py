@@ -312,7 +312,7 @@ def main():
     
     # (Opzionale) Visualizza l'immagine caricata per confermare il caricamento
     if bg_image_file:
-        st.image(bg_image_file, caption="Immagine di sfondo caricata", use_column_width=True)
+        st.image(bg_image_file, caption="Immagine di sfondo caricata", use_container_width=True)
     
     if vis_mode == "Percorsi calcolati (df_results)":
         collegamenti_disponibili = df_results["Collegamento Macchina"].unique()
