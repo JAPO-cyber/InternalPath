@@ -287,18 +287,19 @@ def main():
     )
     
     # --- Sezione finale: Visualizzazione dei percorsi
-    st.subheader("Visualizzazione dei percorsi")
-    vis_mode = st.radio("Scegli la modalità di visualizzazione dei percorsi:", 
-                        ("Percorsi calcolati (df_results)", "Percorsi da Excel"), index=0)
-    
-    if vis_mode == "Percorsi calcolati (df_results)":
-        st.subheader("Visualizzazione dei percorsi calcolati")
+    st.subheader("Visualizzazione dei percorsi calcolati")
         percorso_type = st.radio(
             "Scegli quale percorso visualizzare:",
             ("Ottimale", "Vincolato"),
             index=0,
             key="percorsi_type"
         )
+
+    st.subheader("Visualizzazione dei percorsi")
+    vis_mode = st.radio("Scegli la modalità di visualizzazione dei percorsi:", 
+                        ("Percorsi calcolati (df_results)", "Percorsi da Excel"), index=0)
+    
+    if vis_mode == "Percorsi calcolati (df_results)":
         collegamenti_disponibili = df_results["Collegamento Macchina"].unique()
         selected_collegamenti = st.multiselect(
             "Seleziona uno o più collegamenti da visualizzare:",
