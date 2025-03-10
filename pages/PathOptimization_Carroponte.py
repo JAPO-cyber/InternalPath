@@ -373,62 +373,45 @@ def main():
                 key="excel_selected_sequenze"
             )
             df_filtered_excel = df_filtered_excel[df_filtered_excel["Sequenza"].isin(selected_sequenze_excel)]
+            collegamenti_disponibili = df_filtered_excel ["Sequenza"].unique()
+
             
-            if df_filtered_excel.empty:
-                st.warning("Non ci sono righe che corrispondono ai filtri selezionati.")
-            else:
-                graph_width = st.slider("Larghezza del grafico", 6, 20, 8, key="excel_graph_width")
-                graph_height = st.slider("Altezza del grafico", 6, 20, 6, key="excel_graph_height")
-                bg_file = st.file_uploader("Carica un'immagine di sfondo (opzionale)", type=["png", "jpg", "jpeg"], key="excel_bg")
-                bg_image = None
-                if bg_file is not None:
-                    pil_img = PIL.Image.open(bg_file)
-                    bg_image = np.array(pil_img)
-                mapping = { data.get("entity_name", f"node_{node}"): node 
-                            for node, data in G_graph.nodes(data=True) }
-                pos_local = pos
-                xs = [pos_local[n][0] for n in G_graph.nodes()]
-                ys = [pos_local[n][1] for n in G_graph.nodes()]
-                min_x, max_x = min(xs), max(xs)
-                min_y, max_y = min(ys), max(ys)
-                available_colors = ["red", "blue", "green", "orange", "purple", "brown", "pink", "gray", "cyan", "magenta"]
-                sequence_color_map = {}
-                fig_excel, ax_excel = plt.subplots(figsize=(graph_width, graph_height))
-                fig_excel.patch.set_facecolor('none')
-                ax_excel.set_facecolor('none')
-                if bg_image is not None:
-                    ax_excel.imshow(bg_image, extent=(min_x, max_x, min_y, max_y), zorder=0, aspect='auto')
-                nx.draw_networkx_nodes(G_graph, pos_local, node_size=50, node_color="lightgray", ax=ax_excel)
-                nx.draw_networkx_edges(G_graph, pos_local, edge_color="lightgray", ax=ax_excel, arrows=False, alpha=0.5)
-                legend_patches = []
-                used_labels = set()
-                for idx, row in df_filtered_excel.iterrows():
-                    flusso = row["Flussi"]
-                    path_str = row["Path"]
-                    seq = row["Sequenza"]
-                    if seq not in sequence_color_map:
-                        sequence_color_map[seq] = available_colors[len(sequence_color_map) % len(available_colors)]
-                    color = sequence_color_map[seq]
-                    route_names = [p.strip() for p in path_str.split("-->")]
-                    route_ids = [mapping[name] for name in route_names if name in mapping]
-                    route_edges = [(route_ids[i], route_ids[i+1]) for i in range(len(route_ids)-1)]
-                    if route_edges:
-                        nx.draw_networkx_edges(G_graph, pos_local, edgelist=route_edges, width=2, edge_color=color, ax=ax_excel, arrows=False)
-                    if route_ids:
-                        nx.draw_networkx_nodes(G_graph, pos_local, nodelist=route_ids, node_size=150, node_color=color, ax=ax_excel)
-                        labels = {nid: G_graph.nodes[nid].get("entity_name", f"node_{nid}") for nid in route_ids}
-                        nx.draw_networkx_labels(G_graph, pos_local, labels, font_size=9, ax=ax_excel, font_color="black")
-                    leg_label = f"{flusso} - Sequenza {seq}"
-                    if leg_label not in used_labels:
-                        legend_patches.append(mpatches.Patch(color=color, label=leg_label))
-                        used_labels.add(leg_label)
-                ax_excel.set_title("Percorsi dal file Excel (usando 'Path')")
-                ax_excel.axis("off")
-                if legend_patches:
-                    ax_excel.legend(handles=legend_patches, loc="upper left", title="Legenda")
-                st.pyplot(fig_excel)
-                st.subheader("Dettagli Flussi")
-                st.dataframe(df_filtered_excel)
+            if selected_collegamenti:
+            available_colors = ["red", "blue", "green", "orange", "purple", "brown", "pink", "gray", "cyan", "magenta"]
+            mapping = { data.get("entity_name", f"node_{node}"): node 
+                        for node, data in G_graph.nodes(data=True) }
+            fig, ax = plt.subplots(figsize=(8,6))
+            nx.draw_networkx_nodes(G_graph, pos, node_size=50, node_color="lightgray", ax=ax)
+            nx.draw_networkx_edges(G_graph, pos, edge_color="lightgray", ax=ax, arrows=False, alpha=0.4)
+            
+            legend_patches = []
+            for idx, coll in enumerate(selected_collegamenti):
+                row = df_results[df_results["Collegamento Macchina"] == coll].iloc[0]
+                if percorso_type == "Ottimale":
+                    path_str = row["Percorso Ottimale Seguito"]
+                else:
+                    path_str = row["Percorso Vincolato Seguito"]
+                if path_str == "Nessun percorso":
+                    st.warning(f"Il collegamento {coll} non ha un percorso {percorso_type.lower()} disponibile.")
+                    continue
+                route_names = [p.strip() for p in path_str.split("-->")]
+                route_node_ids = [mapping[n] for n in route_names if n in mapping]
+                route_edges = [(route_node_ids[i], route_node_ids[i+1]) for i in range(len(route_node_ids)-1)]
+                color = available_colors[idx % len(available_colors)]
+                nx.draw_networkx_edges(G_graph, pos, edgelist=route_edges, width=2, edge_color=color, ax=ax, arrows=False)
+                nx.draw_networkx_nodes(G_graph, pos, nodelist=route_node_ids, node_color=color, node_size=150, ax=ax)
+                labels = {nid: G_graph.nodes[nid].get("entity_name", f"node_{nid}") for nid in route_node_ids}
+                nx.draw_networkx_labels(G_graph, pos, labels, font_color="black", font_size=9, ax=ax)
+                legend_patches.append(mpatches.Patch(color=color, label=f"{coll} ({percorso_type})"))
+            ax.set_title(f"Percorsi {percorso_type} Selezionati (inclusi i corridoi)")
+            ax.axis("off")
+            if legend_patches:
+                unique_patches = {}
+                for p in legend_patches:
+                    unique_patches[p.get_label()] = p
+                ax.legend(handles=list(unique_patches.values()), loc="upper left", title="Legenda Percorsi")
+            st.pyplot(fig)
+
 
 if __name__ == "__main__":
     main()
