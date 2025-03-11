@@ -22,7 +22,7 @@ if uploaded_file is not None:
         df[col] = (df[col].astype(str).str.replace(" m", "", regex=False).str.replace(",", ".").astype(float)*max_distance)
         
     # 2. Filtra le righe in cui "Definition Name" è "Macchina" e calcola i vertici del quadrato
-    df_macchina = df[df["Definition Name"] == "Macchina"].copy()
+    df_macchina = df
     
     def calcola_punti(row):
         x = row["X"]
