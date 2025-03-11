@@ -171,7 +171,7 @@ if uploaded_file is not None:
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
     ax.set_aspect('equal')
-    ax.legend()
+    ax.legend(handles=list(unique_patches.values()), loc="upper left",bbox_to_anchor=(1, 1), title="Legenda Percorsi")
     st.pyplot(fig)
     
     # 9. Pulsante per scaricare il TopoJSON
