@@ -76,12 +76,12 @@ if uploaded_file is not None:
     for idx, row in df_result.iterrows():
         polygon = row["Geo_Punti"]
         arcs_geo.append(polygon)
-        ent_name = row["Entity Description"]
+        ent_name = row["Definition Name"]
         geom = {
             "type": "Polygon",
             "arcs": [[idx]],
             "id": ent_name,  # Usa l'Entity Description come id
-            "properties": {"name": ent_name, "Entity Description": ent_name}
+            "properties": {"name": ent_name, "Definition Name": ent_name}
         }
         geometries.append(geom)
     
