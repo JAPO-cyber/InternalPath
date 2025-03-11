@@ -39,7 +39,7 @@ if uploaded_file is not None:
         ]
     
     df_macchina["Punti Quadrato"] = df_macchina.apply(calcola_punti, axis=1)
-    df_result = df_macchina[["Entity Description", "Punti Quadrato"]].reset_index(drop=True)
+    df_result = df_macchina[["Definition Name", "Punti Quadrato"]].reset_index(drop=True)
     
     # 3. Conversione delle coordinate locali in coordinate geografiche
     # Usiamo Bergamo come riferimento: lat 45.698, lon 9.677
