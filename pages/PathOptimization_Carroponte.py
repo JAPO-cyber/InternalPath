@@ -451,7 +451,7 @@ def main():
                 ax.axis("off")
                 if legend_patches:
                     unique_patches = {p.get_label(): p for p in legend_patches}
-                    ax.legend(handles=list(handles=list(unique_patches.values()), loc="upper left",bbox_to_anchor=(1, 1), title="Legenda Percorsi")
+                    ax.legend(handles=list(handles=list(unique_patches.values()), loc="upper left",bbox_to_anchor=(1, 1), title="Legenda Percorsi"))
                 st.pyplot(fig)
 
                 
