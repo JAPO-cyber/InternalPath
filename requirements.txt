@@ -5,3 +5,4 @@ xlsxwriter
 pandas
 openpyxl
 geopandas
+folium
