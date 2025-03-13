@@ -4,3 +4,4 @@ streamlit
 xlsxwriter
 pandas
 openpyxl
+geopandas
