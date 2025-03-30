@@ -82,7 +82,7 @@ if indicators:
         assignment_df[indicator] = 0.0
 
     st.markdown("### Modifica la tabella dei valori da assegnare")
-    # Se il tuo ambiente supporta il data editor, usalo; altrimenti fornisce una textarea con CSV
+    # Usa il data editor se disponibile
     if hasattr(st, "experimental_data_editor"):
         edited_assignment_df = st.experimental_data_editor(assignment_df, num_rows="dynamic")
     elif hasattr(st, "data_editor"):
@@ -102,9 +102,9 @@ if indicators:
     # ==========================================
     # 4. Calcolo del Valore Composito
     # ==========================================
-    # Per ogni parco: Composite = Copertura Vegetale + sum_i( Peso_i * Valore_i )
+    # Calcolo: Composite = Copertura Vegetale * (1 + sum_i(Peso_i * Valore_i))
     composite_values = []
-    # Unisci i dati dei parchi (per Copertura Vegetale) con la tabella assegnata (tramite "Nome Parco")
+    # Unisci i dati dei parchi (per Copertura Vegetale) con la tabella assegnata tramite "Nome Parco"
     merged_df = pd.merge(df_parks[["Nome Parco", "Copertura Vegetale"]], edited_assignment_df, on="Nome Parco", how="left")
     for idx, row in merged_df.iterrows():
         weighted_sum = 0
@@ -113,7 +113,7 @@ if indicators:
             assigned_value = row.get(indicator, 0)
             weighted_sum += weight * assigned_value
         veg_cover = row["Copertura Vegetale"]
-        composite = veg_cover + weighted_sum
+        composite = veg_cover * (1 + weighted_sum)
         composite_values.append(composite)
     # Aggiungi la colonna "Composite Value" al dataset dei parchi
     df_parks["Composite Value"] = composite_values
@@ -131,8 +131,10 @@ st.subheader("Visualizzazione dei Parchi su Mappa")
 df_map = df_parks.copy()
 df_map = df_map.rename(columns={"Coordinata X": "lon", "Coordinata Y": "lat"})
 
-# Per sicurezza, aggiungiamo le colonne per il raggio dei pallini
-# Moltiplichiamo per un fattore (es. 10) per rendere visibili i pallini
+# Crea due colonne per visualizzare le mappe affiancate
+col_left, col_right = st.columns(2)
+
+# Aggiungi campi per il raggio dei pallini, moltiplicati per un fattore (es. 10) per evidenziare la dimensione
 df_map["radius_composite"] = df_map["Composite Value"] * 10
 df_map["radius_veg"] = df_map["Copertura Vegetale"] * 10
 
@@ -144,16 +146,13 @@ view_state = pdk.ViewState(
     pitch=0,
 )
 
-# Crea due colonne per visualizzare le mappe affiancate
-col_left, col_right = st.columns(2)
-
-# Mappa di sinistra: dimensione = Composite Value
+# Mappa di sinistra: dimensione = Composite Value (Copertura Vegetale * (1 + AHP))
 left_layer = pdk.Layer(
     "ScatterplotLayer",
     data=df_map,
     get_position='[lon, lat]',
-    get_fill_color='[200, 50, 80, 180]',  # colore dei pallini
-    get_radius="radius_composite",         # usa il valore composito
+    get_fill_color='[200, 50, 80, 180]',
+    get_radius="radius_composite",
     pickable=True,
     auto_highlight=True,
 )
@@ -162,7 +161,7 @@ left_deck = pdk.Deck(
     initial_view_state=view_state,
     tooltip={"text": "{Nome Parco}\nComposite: {Composite Value}"}
 )
-col_left.subheader("Mappa - Dimensione = Copertura Vegetale + (AHP)")
+col_left.subheader("Mappa - Dimensione = Copertura Vegetale * (1 + AHP)")
 col_left.pydeck_chart(left_deck)
 
 # Mappa di destra: dimensione = Copertura Vegetale
@@ -171,7 +170,7 @@ right_layer = pdk.Layer(
     data=df_map,
     get_position='[lon, lat]',
     get_fill_color='[50, 150, 200, 180]',
-    get_radius="radius_veg",               # usa la copertura vegetale
+    get_radius="radius_veg",
     pickable=True,
     auto_highlight=True,
 )
@@ -200,4 +199,5 @@ if indicators:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
         st.success("Tabella salvata correttamente!")
+
 
