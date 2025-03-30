@@ -21,10 +21,9 @@ def load_ahp_data(file) -> tuple:
         if "Indicatore" not in df.columns or "Peso Relativo" not in df.columns:
             st.error("Il file AHP deve contenere le colonne 'Indicatore' e 'Peso Relativo'.")
             return [], {}
-        indicators = df["Indicatore"].tolist()
+        inds = df["Indicatore"].tolist()
         weights = df["Peso Relativo"].tolist()
-        weights_dict = dict(zip(indicators, weights))
-        return indicators, weights_dict
+        return inds, dict(zip(inds, weights))
     except Exception as e:
         st.error(f"Errore nel caricamento del file AHP: {e}")
         return [], {}
@@ -56,18 +55,18 @@ def default_parks_data() -> pd.DataFrame:
     ]
     return pd.DataFrame(data)
 
-def create_assignment_table(df_parks: pd.DataFrame, indicators: list) -> pd.DataFrame:
+def create_assignment_table(df_parks: pd.DataFrame, inds: list) -> pd.DataFrame:
     df = pd.DataFrame()
     df["Nome Parco"] = df_parks["Nome Parco"]
-    for ind in indicators:
+    for ind in inds:
         df[ind] = 0.0
     return df
 
-def calculate_composite_values(df_parks: pd.DataFrame, assignment_df: pd.DataFrame, indicators: list, weights_dict: dict) -> pd.DataFrame:
+def calculate_composite_values(df_parks: pd.DataFrame, assignment_df: pd.DataFrame, inds: list, weights_dict: dict) -> pd.DataFrame:
     merged = pd.merge(df_parks[["Nome Parco", "Copertura Vegetale"]], assignment_df, on="Nome Parco", how="left")
     composite_values = []
     for idx, row in merged.iterrows():
-        weighted_sum = sum(weights_dict.get(ind, 0) * row.get(ind, 0) for ind in indicators)
+        weighted_sum = sum(weights_dict.get(ind, 0) * row.get(ind, 0) for ind in inds)
         composite = row["Copertura Vegetale"] * (1 + weighted_sum)
         composite_values.append(composite)
     if len(composite_values) == len(df_parks):
@@ -194,12 +193,24 @@ tabs = st.tabs(["Dati", "Assegnazione e Calcoli", "Mappe", "Analisi & Download"]
 with tabs[0]:
     st.header("Caricamento Dati")
     st.write("Carica il file Excel dei pesi AHP e, se disponibile, il file Excel dei parchi. Se non carichi quest'ultimo, verrà usato un dataset di default.")
+    # Caricamento file AHP
+    ahp_file = st.file_uploader("File AHP", type=["xlsx"], key="ahp_tab1")
+    if ahp_file is not None:
+        indicators, weights_dict = load_ahp_data(ahp_file)
+    # Caricamento file Parchi
+    parks_file = st.file_uploader("File dei Parchi (opzionale)", type=["xlsx"], key="parks_tab1")
+    if parks_file is not None:
+        df_parks = load_parks_data(parks_file)
+    if parks_file is None or df_parks is None:
+        df_parks = default_parks_data()
+    st.subheader("Dati dei Parchi")
+    st.dataframe(df_parks, use_container_width=True)
 
 # --- Tab 2: Assegnazione e Calcoli ---
 with tabs[1]:
     st.header("Assegnazione Valori e Calcoli")
     if not indicators:
-        st.info("Carica il file AHP per procedere con l'assegnazione degli indici.")
+        st.info("Carica il file AHP nella scheda 'Dati' per procedere con l'assegnazione degli indici.")
     else:
         st.write("Modifica la tabella per assegnare un valore (tra 0 e 1) agli indici per ciascun parco.")
         assignment_df = create_assignment_table(df_parks, indicators)
@@ -224,28 +235,32 @@ with tabs[1]:
         df_parks = calculate_composite_values(df_parks.copy(), edited_assignment_df, indicators, weights_dict)
         st.subheader("Dati dei Parchi con Valore Composito")
         st.dataframe(df_parks, use_container_width=True)
-        V, max_L, k, rho, epsilon = calculate_parameters(df_parks, st.slider("Seleziona L (numero di coppie di parchi)", min_value=0, max_value=int(df_parks.shape[0]*(df_parks.shape[0]-1)/2), value=0))
+        L_val = st.slider("Seleziona L (numero di coppie di parchi)", min_value=0, max_value=int(df_parks.shape[0]*(df_parks.shape[0]-1)/2), value=0)
+        V, max_L, k, rho, epsilon = calculate_parameters(df_parks, L_val)
         if k is not None and rho is not None:
             st.markdown("#### Parametri")
             st.write(f"**Numero di parchi (V):** {V}")
-            st.write(f"**L (coppie):** {L} (max: {max_L})")
+            st.write(f"**L (coppie):** {L_val} (max: {max_L})")
             st.write(f"**Connettività (k):** {k}")
             st.write(f"**Resilienza (ρ):** {rho}")
             st.write(f"**Epsilon (k+ρ):** {epsilon}")
+        # Salva df_parks aggiornato in session state per gli altri tab
+        st.session_state.df_parks = df_parks
 
 # --- Tab 3: Mappe ---
 with tabs[2]:
     st.header("Visualizzazione delle Mappe")
-    if "Composite Value" not in df_parks.columns:
-        st.error("Prima calcola i valori compositi nella sezione 'Assegnazione e Calcoli'.")
+    if "df_parks" not in st.session_state:
+        st.error("Prima calcola i valori compositi nella scheda 'Assegnazione e Calcoli'.")
     else:
-        display_maps(df_parks)
+        display_maps(st.session_state.df_parks)
 
 # --- Tab 4: Analisi & Download ---
 with tabs[3]:
     st.header("Analisi e Download")
-    if "Composite Value" not in df_parks.columns:
-        st.error("Prima calcola i valori compositi nella sezione 'Assegnazione e Calcoli'.")
+    if "df_parks" not in st.session_state:
+        st.error("Prima calcola i valori compositi nella scheda 'Assegnazione e Calcoli'.")
     else:
-        display_analysis(df_parks, epsilon if epsilon is not None else 0)
+        display_analysis(st.session_state.df_parks, epsilon if epsilon is not None else 0)
+
 
