@@ -13,6 +13,24 @@ st.write("Carica i file necessari, assegna un valore (tra 0 e 1) agli indici per
 # 1. Caricamento file AHP
 # ================================
 ahp_file = st.file_uploader("Carica il file Excel dei pesi AHP (colonne: 'Indicatore' e 'Peso Relativo')", type=["xlsx"], key="ahp")
+if ahp_file is not None:import streamlit as st
+import pandas as pd
+import pydeck as pdk
+import io
+
+# Imposta il layout a schermo intero (wide) per PC
+st.set_page_config(layout="wide", page_title="AHP Parchi Bergamo")
+
+# ================================
+# Titolo e descrizione della pagina
+# ================================
+st.title("Assegnazione Valori AHP ai Parchi e Visualizzazione su Mappa")
+st.write("Carica i file necessari, assegna un valore (tra 0 e 1) agli indici per ciascun parco e visualizza i risultati su due mappe affiancate.")
+
+# ================================
+# 1. Caricamento file AHP
+# ================================
+ahp_file = st.file_uploader("Carica il file Excel dei pesi AHP (colonne: 'Indicatore' e 'Peso Relativo')", type=["xlsx"], key="ahp")
 if ahp_file is not None:
     try:
         ahp_df = pd.read_excel(ahp_file)
@@ -69,7 +87,7 @@ if uploaded_parks is None or df_parks is None:
     df_parks = pd.DataFrame(data_parks)
 
 st.subheader("Dati dei Parchi")
-st.dataframe(df_parks)
+st.dataframe(df_parks, use_container_width=True)
 
 # ================================
 # 3. Tabella di Assegnazione Valori
@@ -83,11 +101,11 @@ if indicators:
         assignment_df[indicator] = 0.0
 
     st.markdown("### Modifica la tabella dei valori da assegnare")
-    # Usa il data editor se disponibile
+    # Usa il data editor se disponibile, ottimizzando lo spazio con use_container_width
     if hasattr(st, "experimental_data_editor"):
-        edited_assignment_df = st.experimental_data_editor(assignment_df, num_rows="dynamic")
+        edited_assignment_df = st.experimental_data_editor(assignment_df, num_rows="dynamic", use_container_width=True)
     elif hasattr(st, "data_editor"):
-        edited_assignment_df = st.data_editor(assignment_df, num_rows="dynamic")
+        edited_assignment_df = st.data_editor(assignment_df, num_rows="dynamic", use_container_width=True)
     else:
         st.info("Il data editor non è disponibile. Modifica il CSV sottostante e premi INVIO.")
         csv_text = st.text_area("Modifica CSV", assignment_df.to_csv(index=False))
@@ -98,7 +116,7 @@ if indicators:
             edited_assignment_df = assignment_df
 
     st.subheader("Tabella di assegnazione valori (modificata)")
-    st.dataframe(edited_assignment_df)
+    st.dataframe(edited_assignment_df, use_container_width=True)
 
     # ================================
     # 4. Calcolo del Valore Composito
@@ -118,7 +136,7 @@ if indicators:
     df_parks["Composite Value"] = composite_values
 
     st.subheader("Dati dei Parchi con Valore Composito")
-    st.dataframe(df_parks)
+    st.dataframe(df_parks, use_container_width=True)
 else:
     st.info("Carica il file AHP per assegnare i valori agli indici.")
 
@@ -142,9 +160,9 @@ view_state = pdk.ViewState(
     pitch=0,
 )
 
-# Creazione di una legenda in HTML
+# Creazione della legenda in HTML (ottimizzata per PC)
 legend_html = """
-<div style="background-color: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+<div style="background-color: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; font-size: 14px;">
   <h4 style="margin-bottom: 5px;">Legenda Mappa</h4>
   <ul style="list-style-type: none; padding-left: 0; margin: 0;">
     <li>
@@ -158,10 +176,9 @@ legend_html = """
   </ul>
 </div>
 """
-
 st.markdown(legend_html, unsafe_allow_html=True)
 
-# Creazione di due colonne per visualizzare le mappe affiancate
+# Disposizione delle mappe affiancate in due colonne
 col_left, col_right = st.columns(2)
 
 # Mappa di sinistra: dimensione = Composite Value
