@@ -89,6 +89,17 @@ def calculate_parameters(df_parks: pd.DataFrame, L: int) -> tuple:
     epsilon = k + rho
     return V, max_L, k, rho, epsilon
 
+def prepare_analysis_data(df_parks: pd.DataFrame, assignment_df: pd.DataFrame, inds: list, weights_dict: dict) -> pd.DataFrame:
+    # Unisci i dati originali dei parchi con la tabella di assegnazione
+    merged = pd.merge(df_parks[["Nome Parco", "Copertura Vegetale"]], assignment_df, on="Nome Parco", how="left")
+    # Calcola il breakdown per ciascun parco
+    merged["Breakdown"] = merged.apply(
+        lambda row: ", ".join(f"{ind}: {weights_dict.get(ind,0)*row.get(ind, 0):.2f}" for ind in inds), axis=1
+    )
+    # Unisci con il valore composito già calcolato
+    analysis_df = pd.merge(merged, df_parks[["Nome Parco", "Composite Value"]], on="Nome Parco", how="left")
+    return analysis_df
+
 def display_maps(df_parks: pd.DataFrame):
     df_map = df_parks.copy().rename(columns={"Coordinata X": "lon", "Coordinata Y": "lat"})
     df_map["radius_composite"] = df_map["Composite Value"] * 10
@@ -149,55 +160,42 @@ def display_maps(df_parks: pd.DataFrame):
     col_right.subheader("Mappa: Copertura Vegetale")
     col_right.pydeck_chart(right_deck)
 
-def display_analysis(df_parks: pd.DataFrame, epsilon: float):
-    st.markdown("### Analisi e Download")
-    phi = df_parks["Composite Value"].sum() * (1 + epsilon)
-    urban_standard = df_parks["Copertura Vegetale"].sum()
-    if urban_standard != 0:
-        percent_increase = ((phi - urban_standard) / urban_standard) * 100
-    else:
-        percent_increase = None
-    st.write(f"**φ (Dotazione di servizi ecosistemici):** {phi:.2f}")
-    st.write(f"**Standard urbanistico (Somma Copertura Vegetale):** {urban_standard:.2f}")
-    if percent_increase is not None:
-        st.write(f"**Aumento percentuale rispetto allo standard:** {percent_increase:.2f}%")
-    chart_data = df_parks[["Nome Parco", "Composite Value"]]
-    bar_chart = alt.Chart(chart_data).mark_bar().encode(
-        x=alt.X("Nome Parco:N", sort=None, title="Parco"),
-        y=alt.Y("Composite Value:Q", title="Valore Composito"),
-        tooltip=["Nome Parco", "Composite Value"]
-    ).properties(
-        width=600,
-        height=300,
-        title="Distribuzione dei Valori Compositi"
+def display_analysis(analysis_df: pd.DataFrame):
+    st.markdown("### Analisi Comparativa per Parco")
+    # Prepara i dati per il grafico a barre: per ogni parco, mettiamo due valori (originale e composito)
+    chart_data = analysis_df.melt(
+        id_vars=["Nome Parco", "Copertura Vegetale", "Composite Value", "Breakdown"],
+        value_vars=["Copertura Vegetale", "Composite Value"],
+        var_name="Tipo Valore", value_name="Valore"
     )
-    st.altair_chart(bar_chart, use_container_width=True)
-    if st.button("Salva tabella assegnazioni in Excel"):
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            edited_assignment_df.to_excel(writer, index=False, sheet_name='Assegnazioni')
-        st.download_button(
-            label="Scarica il file Excel delle assegnazioni",
-            data=output.getvalue(),
-            file_name="assegnazioni_parchi.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-        st.success("Tabella salvata correttamente!")
+    chart = alt.Chart(chart_data).mark_bar().encode(
+        x=alt.X("Nome Parco:N", title="Parco"),
+        y=alt.Y("Valore:Q", title="Valore"),
+        color=alt.Color("Tipo Valore:N", scale=alt.Scale(domain=["Copertura Vegetale", "Composite Value"], range=["#1f77b4", "#d62728"])),
+        tooltip=["Nome Parco", "Copertura Vegetale", "Composite Value", "Breakdown"]
+    ).properties(
+        width=700,
+        height=400,
+        title="Confronto per Parco: Valore Originale vs. Modificato"
+    ).interactive()
+    st.altair_chart(chart, use_container_width=True)
+
+    st.markdown("Clicca (o passa il mouse) su una barra per vedere il dettaglio delle voci che compongono il valore (Breakdown).")
 
 # ------------------------------
 # Interfaccia a Tab per una migliore UX
 # ------------------------------
+st.set_page_config(layout="wide", page_title="AHP Parchi Bergamo")
+
 tabs = st.tabs(["Dati", "Assegnazione e Calcoli", "Mappe", "Analisi & Download"])
 
 # --- Tab 1: Dati ---
 with tabs[0]:
     st.header("Caricamento Dati")
     st.write("Carica il file Excel dei pesi AHP e, se disponibile, il file Excel dei parchi. Se non carichi quest'ultimo, verrà usato un dataset di default.")
-    # Caricamento file AHP
     ahp_file = st.file_uploader("File AHP", type=["xlsx"], key="ahp_tab1")
     if ahp_file is not None:
         indicators, weights_dict = load_ahp_data(ahp_file)
-    # Caricamento file Parchi
     parks_file = st.file_uploader("File dei Parchi (opzionale)", type=["xlsx"], key="parks_tab1")
     if parks_file is not None:
         df_parks = load_parks_data(parks_file)
@@ -244,8 +242,9 @@ with tabs[1]:
             st.write(f"**Connettività (k):** {k}")
             st.write(f"**Resilienza (ρ):** {rho}")
             st.write(f"**Epsilon (k+ρ):** {epsilon}")
-        # Salva df_parks aggiornato in session state per gli altri tab
+        # Salva dati in session_state per le altre schede
         st.session_state.df_parks = df_parks
+        st.session_state.edited_assignment_df = edited_assignment_df
 
 # --- Tab 3: Mappe ---
 with tabs[2]:
@@ -258,9 +257,13 @@ with tabs[2]:
 # --- Tab 4: Analisi & Download ---
 with tabs[3]:
     st.header("Analisi e Download")
-    if "df_parks" not in st.session_state:
+    if "df_parks" not in st.session_state or "edited_assignment_df" not in st.session_state:
         st.error("Prima calcola i valori compositi nella scheda 'Assegnazione e Calcoli'.")
     else:
-        display_analysis(st.session_state.df_parks, epsilon if epsilon is not None else 0)
+        analysis_df = prepare_analysis_data(st.session_state.df_parks, st.session_state.edited_assignment_df, indicators, weights_dict)
+        st.markdown("#### Confronto Parco per Parco")
+        st.dataframe(analysis_df[["Nome Parco", "Copertura Vegetale", "Composite Value", "Breakdown"]], use_container_width=True)
+        display_analysis(analysis_df)
+
 
 
