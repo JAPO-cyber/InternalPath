@@ -100,7 +100,6 @@ if len(all_selected) > 1:
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         weights_df.to_excel(writer, index=False, sheet_name='AHP_Weights')
-        writer.save()
     excel_data = output.getvalue()
 
     st.download_button(
@@ -112,4 +111,5 @@ if len(all_selected) > 1:
 
     # Salvataggio del file Excel sul disco (nella stessa directory del codice)
     weights_df.to_excel('ahp_weights.xlsx', index=False)
+
 
