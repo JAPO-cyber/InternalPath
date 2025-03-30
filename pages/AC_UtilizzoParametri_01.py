@@ -4,6 +4,10 @@ import pydeck as pdk
 import io
 import altair as alt
 
+# Definisci variabili globali per evitare NameError
+indicators = []
+weights_dict = {}
+
 # ------------------------------
 # Funzioni di utilità
 # ------------------------------
@@ -74,14 +78,11 @@ def calculate_composite_values(df_parks: pd.DataFrame, assignment_df: pd.DataFra
 
 def calculate_parameters(df_parks: pd.DataFrame, L: int) -> tuple:
     V = df_parks.shape[0]
-    # max coppie non ordinate
     max_L = int(V * (V - 1) / 2)
     if V <= 2:
         st.error("Il numero di parchi (V) deve essere maggiore di 2 per calcolare i parametri.")
         return V, max_L, None, None, None
-    # k = L / (3*(V-2))
     k = L / (3 * (V - 2))
-    # rho = (L - (V+1)) / (2*V - 5)
     if (2 * V - 5) == 0:
         st.error("Il denominatore per il calcolo di ρ è zero.")
         return V, max_L, k, None, None
@@ -90,19 +91,15 @@ def calculate_parameters(df_parks: pd.DataFrame, L: int) -> tuple:
     return V, max_L, k, rho, epsilon
 
 def display_maps(df_parks: pd.DataFrame):
-    # Prepara i dati per Pydeck
     df_map = df_parks.copy().rename(columns={"Coordinata X": "lon", "Coordinata Y": "lat"})
     df_map["radius_composite"] = df_map["Composite Value"] * 10
     df_map["radius_veg"] = df_map["Copertura Vegetale"] * 10
-
     view_state = pdk.ViewState(
         latitude=df_map["lat"].mean(),
         longitude=df_map["lon"].mean(),
         zoom=12,
         pitch=0,
     )
-
-    # Legenda in HTML
     legend_html = """
     <div style="background-color: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; font-size: 14px;">
       <h4 style="margin-bottom: 5px;">Legenda Mappa</h4>
@@ -119,10 +116,7 @@ def display_maps(df_parks: pd.DataFrame):
     </div>
     """
     st.markdown(legend_html, unsafe_allow_html=True)
-
     col_left, col_right = st.columns(2)
-
-    # Mappa Composite
     left_layer = pdk.Layer(
         "ScatterplotLayer",
         data=df_map,
@@ -139,8 +133,6 @@ def display_maps(df_parks: pd.DataFrame):
     )
     col_left.subheader("Mappa: Copertura Vegetale × (1 + AHP)")
     col_left.pydeck_chart(left_deck)
-
-    # Mappa Vegetazione
     right_layer = pdk.Layer(
         "ScatterplotLayer",
         data=df_map,
@@ -160,21 +152,16 @@ def display_maps(df_parks: pd.DataFrame):
 
 def display_analysis(df_parks: pd.DataFrame, epsilon: float):
     st.markdown("### Analisi e Download")
-    # Calcola φ = (somma dei Composite Value) * (1 + ε)
     phi = df_parks["Composite Value"].sum() * (1 + epsilon)
-    # Standard urbanistico: somma di Copertura Vegetale
     urban_standard = df_parks["Copertura Vegetale"].sum()
     if urban_standard != 0:
         percent_increase = ((phi - urban_standard) / urban_standard) * 100
     else:
         percent_increase = None
-
     st.write(f"**φ (Dotazione di servizi ecosistemici):** {phi:.2f}")
     st.write(f"**Standard urbanistico (Somma Copertura Vegetale):** {urban_standard:.2f}")
     if percent_increase is not None:
         st.write(f"**Aumento percentuale rispetto allo standard:** {percent_increase:.2f}%")
-
-    # Grafico: distribuzione dei valori compositi
     chart_data = df_parks[["Nome Parco", "Composite Value"]]
     bar_chart = alt.Chart(chart_data).mark_bar().encode(
         x=alt.X("Nome Parco:N", sort=None, title="Parco"),
@@ -186,8 +173,6 @@ def display_analysis(df_parks: pd.DataFrame, epsilon: float):
         title="Distribuzione dei Valori Compositi"
     )
     st.altair_chart(bar_chart, use_container_width=True)
-
-    # Pulsante di download della tabella di assegnazione
     if st.button("Salva tabella assegnazioni in Excel"):
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -201,7 +186,7 @@ def display_analysis(df_parks: pd.DataFrame, epsilon: float):
         st.success("Tabella salvata correttamente!")
 
 # ------------------------------
-# Interfaccia a Tab per migliorare l'esperienza UX
+# Interfaccia a Tab per una migliore UX
 # ------------------------------
 tabs = st.tabs(["Dati", "Assegnazione e Calcoli", "Mappe", "Analisi & Download"])
 
@@ -209,7 +194,6 @@ tabs = st.tabs(["Dati", "Assegnazione e Calcoli", "Mappe", "Analisi & Download"]
 with tabs[0]:
     st.header("Caricamento Dati")
     st.write("Carica il file Excel dei pesi AHP e, se disponibile, il file Excel dei parchi. Se non carichi quest'ultimo, verrà usato un dataset di default.")
-    # (I file sono già stati caricati nelle sezioni sopra.)
 
 # --- Tab 2: Assegnazione e Calcoli ---
 with tabs[1]:
@@ -218,14 +202,29 @@ with tabs[1]:
         st.info("Carica il file AHP per procedere con l'assegnazione degli indici.")
     else:
         st.write("Modifica la tabella per assegnare un valore (tra 0 e 1) agli indici per ciascun parco.")
-        # Mostriamo la tabella di assegnazione (già creata sopra)
+        assignment_df = create_assignment_table(df_parks, indicators)
+        if hasattr(st, "experimental_data_editor"):
+            edited_assignment_df = st.experimental_data_editor(assignment_df, num_rows="dynamic", use_container_width=True)
+        elif hasattr(st, "data_editor"):
+            edited_assignment_df = st.data_editor(assignment_df, num_rows="dynamic", use_container_width=True)
+        else:
+            st.info("Il data editor non è disponibile. Modifica il CSV sottostante e premi INVIO.")
+            csv_text = st.text_area("Modifica CSV", assignment_df.to_csv(index=False))
+            try:
+                edited_assignment_df = pd.read_csv(io.StringIO(csv_text))
+            except Exception as e:
+                st.error("Errore nella conversione del CSV: " + str(e))
+                edited_assignment_df = assignment_df
+        for ind in indicators:
+            if (edited_assignment_df[ind] < 0).any() or (edited_assignment_df[ind] > 1).any():
+                st.error(f"I valori per l'indicatore '{ind}' devono essere compresi tra 0 e 1. Valori fuori range sono stati limitati.")
+                edited_assignment_df[ind] = edited_assignment_df[ind].clip(lower=0, upper=1)
+        st.subheader("Tabella di Assegnazione (modificata)")
         st.dataframe(edited_assignment_df, use_container_width=True)
-        # Calcolo del valore composito
-        df_parks_updated = calculate_composite_values(df_parks.copy(), edited_assignment_df, indicators, weights_dict)
+        df_parks = calculate_composite_values(df_parks.copy(), edited_assignment_df, indicators, weights_dict)
         st.subheader("Dati dei Parchi con Valore Composito")
-        st.dataframe(df_parks_updated, use_container_width=True)
-        # Parametri: impostiamo L tramite sidebar per questa sezione
-        V, max_L, k, rho, epsilon = calculate_parameters(df_parks_updated, st.slider("Seleziona L (numero di coppie di parchi)", min_value=0, max_value=int(df_parks_updated.shape[0]*(df_parks_updated.shape[0]-1)/2), value=0))
+        st.dataframe(df_parks, use_container_width=True)
+        V, max_L, k, rho, epsilon = calculate_parameters(df_parks, st.slider("Seleziona L (numero di coppie di parchi)", min_value=0, max_value=int(df_parks.shape[0]*(df_parks.shape[0]-1)/2), value=0))
         if k is not None and rho is not None:
             st.markdown("#### Parametri")
             st.write(f"**Numero di parchi (V):** {V}")
@@ -249,3 +248,4 @@ with tabs[3]:
         st.error("Prima calcola i valori compositi nella sezione 'Assegnazione e Calcoli'.")
     else:
         display_analysis(df_parks, epsilon if epsilon is not None else 0)
+
