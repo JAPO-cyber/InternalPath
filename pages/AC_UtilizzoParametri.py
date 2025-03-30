@@ -3,21 +3,6 @@ import pandas as pd
 import pydeck as pdk
 import io
 
-# ================================
-# Titolo e descrizione della pagina
-# ================================
-st.title("Assegnazione Valori AHP ai Parchi e Visualizzazione su Mappa")
-st.write("Carica i file necessari, assegna un valore (tra 0 e 1) agli indici per ciascun parco e visualizza i risultati su due mappe affiancate.")
-
-# ================================
-# 1. Caricamento file AHP
-# ================================
-ahp_file = st.file_uploader("Carica il file Excel dei pesi AHP (colonne: 'Indicatore' e 'Peso Relativo')", type=["xlsx"], key="ahp")
-if ahp_file is not None:import streamlit as st
-import pandas as pd
-import pydeck as pdk
-import io
-
 # Imposta il layout a schermo intero (wide) per PC
 st.set_page_config(layout="wide", page_title="AHP Parchi Bergamo")
 
