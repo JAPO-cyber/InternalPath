@@ -261,6 +261,23 @@ if indicators:
         )
         st.success("Tabella salvata correttamente!")
 
+# ================================
+# 10. Calcolo Dotazione di Servizi Ecosistemici e Confronto
+# ================================
+# Calcola φ = (somma dei Composite Value) * (1 + ε)
+phi = df_parks["Composite Value"].sum() * (1 + epsilon)
+# Valore standard urbanistico: somma della Copertura Vegetale
+urban_standard = df_parks["Copertura Vegetale"].sum()
+if urban_standard != 0:
+    percent_increase = ((phi - urban_standard) / urban_standard) * 100
+else:
+    percent_increase = None
+
+st.markdown("### Dotazione di Servizi Ecosistemici e Confronto con Standard Urbanistico")
+st.write(f"**φ (Dotazione di servizi ecosistemici):** {phi:.2f}")
+st.write(f"**Valore standard urbanistico (somma Copertura Vegetale):** {urban_standard:.2f}")
+if percent_increase is not None:
+    st.write(f"**Aumento percentuale rispetto allo standard urbanistico:** {percent_increase:.2f}%")
 
 
 
