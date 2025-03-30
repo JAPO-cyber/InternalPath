@@ -252,7 +252,63 @@ with tabs[2]:
     if "df_parks" not in st.session_state:
         st.error("Prima calcola i valori compositi nella scheda 'Assegnazione e Calcoli'.")
     else:
-        display_maps(st.session_state.df_parks)
+        # Copia del dataframe e rinomina per Pydeck
+        df_map = st.session_state.df_parks.copy().rename(columns={"Coordinata X": "lon", "Coordinata Y": "lat"})
+        
+        # Slider per regolare il fattore di scala dei marker
+        scale_factor = st.slider("Regola il fattore di scala dei marker", min_value=5, max_value=20, value=10)
+        df_map["radius_composite"] = df_map["Composite Value"] * scale_factor
+        df_map["radius_veg"] = df_map["Copertura Vegetale"] * scale_factor
+        
+        # Stato iniziale della vista
+        view_state = pdk.ViewState(
+            latitude=df_map["lat"].mean(),
+            longitude=df_map["lon"].mean(),
+            zoom=12,
+            pitch=0,
+        )
+        
+        # Possibilità di scegliere quale mappa visualizzare
+        map_option = st.radio(
+            "Scegli il tipo di mappa da visualizzare",
+            ("Mappa Composite", "Mappa Vegetazione", "Visualizza Entrambe")
+        )
+        
+        if map_option in ("Mappa Composite", "Visualizza Entrambe"):
+            st.subheader("Mappa: Copertura Vegetale × (1 + AHP)")
+            composite_layer = pdk.Layer(
+                "ScatterplotLayer",
+                data=df_map,
+                get_position='[lon, lat]',
+                get_fill_color='[200,50,80,180]',
+                get_radius="radius_composite",
+                pickable=True,
+                auto_highlight=True,
+            )
+            composite_deck = pdk.Deck(
+                layers=[composite_layer],
+                initial_view_state=view_state,
+                tooltip={"text": "{Nome Parco}\nComposite: {Composite Value}"}
+            )
+            st.pydeck_chart(composite_deck)
+        
+        if map_option in ("Mappa Vegetazione", "Visualizza Entrambe"):
+            st.subheader("Mappa: Copertura Vegetale")
+            veg_layer = pdk.Layer(
+                "ScatterplotLayer",
+                data=df_map,
+                get_position='[lon, lat]',
+                get_fill_color='[50,150,200,180]',
+                get_radius="radius_veg",
+                pickable=True,
+                auto_highlight=True,
+            )
+            veg_deck = pdk.Deck(
+                layers=[veg_layer],
+                initial_view_state=view_state,
+                tooltip={"text": "{Nome Parco}\nCopertura: {Copertura Vegetale}"}
+            )
+            st.pydeck_chart(veg_deck)
 
 # --- Tab 4: Analisi & Download ---
 with tabs[3]:
@@ -260,10 +316,65 @@ with tabs[3]:
     if "df_parks" not in st.session_state or "edited_assignment_df" not in st.session_state:
         st.error("Prima calcola i valori compositi nella scheda 'Assegnazione e Calcoli'.")
     else:
-        analysis_df = prepare_analysis_data(st.session_state.df_parks, st.session_state.edited_assignment_df, indicators, weights_dict)
-        st.markdown("#### Confronto Parco per Parco")
-        st.dataframe(analysis_df[["Nome Parco", "Copertura Vegetale", "Composite Value", "Breakdown"]], use_container_width=True)
-        display_analysis(analysis_df)
+        # Prepara il dataframe di analisi con un breakdown dei contributi
+        analysis_df = prepare_analysis_data(
+            st.session_state.df_parks,
+            st.session_state.edited_assignment_df,
+            indicators,
+            weights_dict
+        )
+        
+        st.markdown("#### Confronto per Parco: Valore Originale vs. Modificato")
+        st.dataframe(
+            analysis_df[["Nome Parco", "Copertura Vegetale", "Composite Value", "Breakdown"]],
+            use_container_width=True
+        )
+        
+        # Grafico interattivo con Altair: confronto dei due valori per ciascun parco
+        chart_data = analysis_df.melt(
+            id_vars=["Nome Parco", "Copertura Vegetale", "Composite Value", "Breakdown"],
+            value_vars=["Copertura Vegetale", "Composite Value"],
+            var_name="Tipo Valore",
+            value_name="Valore"
+        )
+        chart = alt.Chart(chart_data).mark_bar().encode(
+            x=alt.X("Nome Parco:N", title="Parco", axis=alt.Axis(labelAngle=-45)),
+            y=alt.Y("Valore:Q", title="Valore"),
+            color=alt.Color(
+                "Tipo Valore:N",
+                scale=alt.Scale(
+                    domain=["Copertura Vegetale", "Composite Value"],
+                    range=["#1f77b4", "#d62728"]
+                )
+            ),
+            tooltip=["Nome Parco", "Copertura Vegetale", "Composite Value", "Breakdown"]
+        ).properties(
+            width=700,
+            height=400,
+            title="Confronto per Parco: Valore Originale vs. Modificato"
+        ).interactive()
+        st.altair_chart(chart, use_container_width=True)
+        
+        # Selezione manuale del parco per vedere il dettaglio del breakdown
+        park_selected = st.selectbox(
+            "Seleziona un parco per visualizzare il dettaglio del breakdown",
+            analysis_df["Nome Parco"].unique()
+        )
+        breakdown_info = analysis_df.loc[analysis_df["Nome Parco"] == park_selected, "Breakdown"].iloc[0]
+        st.markdown(f"**Breakdown per {park_selected}:** {breakdown_info}")
+        
+        # Download della tabella di analisi in Excel
+        if st.button("Scarica tabella di analisi in Excel"):
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+                analysis_df.to_excel(writer, index=False, sheet_name="Analisi")
+            st.download_button(
+                label="Download Excel",
+                data=output.getvalue(),
+                file_name="analisi_parchi.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            st.success("File Excel generato con successo!")
 
 
 
