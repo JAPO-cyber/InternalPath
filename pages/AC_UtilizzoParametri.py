@@ -4,10 +4,11 @@ import pydeck as pdk
 import io
 
 st.title("Assegnazione Valori AHP ai Parchi e Visualizzazione su Mappa")
+st.write("Carica i file necessari e assegna un valore (tra 0 e 1) ad ogni indicatore per ciascun parco.")
 
-# --------------------------
+# ==========================================
 # 1. Caricamento file AHP
-# --------------------------
+# ==========================================
 ahp_file = st.file_uploader("Carica il file Excel dei pesi AHP (colonne: 'Indicatore' e 'Peso Relativo')", type=["xlsx"], key="ahp")
 if ahp_file is not None:
     try:
@@ -31,16 +32,16 @@ else:
     indicators = []
     weights_dict = {}
 
-# --------------------------
+# ==========================================
 # 2. Caricamento dataset Parchi
-# --------------------------
+# ==========================================
 uploaded_parks = st.file_uploader("Carica il file Excel dei parchi (opzionale)", type=["xlsx"], key="parks")
 df_parks = None
 if uploaded_parks is not None:
     try:
         df_parks = pd.read_excel(uploaded_parks)
         st.success("File dei parchi caricato!")
-        # Verifica le colonne necessarie
+        # Verifica che il file contenga le colonne necessarie
         required_cols = ["Nome Parco", "Coordinata X", "Coordinata Y", "Copertura Vegetale"]
         if not all(col in df_parks.columns for col in required_cols):
             st.error("Il file dei parchi deve contenere le colonne: " + ", ".join(required_cols))
@@ -50,7 +51,7 @@ if uploaded_parks is not None:
         df_parks = None
 
 if uploaded_parks is None or df_parks is None:
-    # Dataset di default con la colonna "Copertura Vegetale"
+    # Dataset di default per i parchi (con la colonna "Copertura Vegetale")
     data_parks = [
         {"Nome Parco": "Parco dei Colli",         "Coordinata X": 9.680, "Coordinata Y": 45.700, "Copertura Vegetale": 40},
         {"Nome Parco": "Parco Ticinello",         "Coordinata X": 9.670, "Coordinata Y": 45.690, "Copertura Vegetale": 50},
@@ -68,87 +69,101 @@ if uploaded_parks is None or df_parks is None:
 st.subheader("Dati dei Parchi")
 st.dataframe(df_parks)
 
-# --------------------------
+# ==========================================
 # 3. Tabella di Assegnazione Valori
-# --------------------------
+# ==========================================
 if indicators:
-    st.subheader("Assegna un valore (tra 0 e 1) agli indici per ogni parco")
-    # Crea un dataframe per la tabella di assegnazione; la prima colonna è "Nome Parco"
+    st.subheader("Assegna un valore (tra 0 e 1) agli indici per ciascun parco")
+    # Crea un dataframe di assegnazione: la prima colonna è "Nome Parco"
     assignment_df = pd.DataFrame()
     assignment_df["Nome Parco"] = df_parks["Nome Parco"]
-    
-    # Per ogni indicatore, crea una serie di input (uno per ogni parco)
+    # Inizialmente, per ogni indicatore, assegna 0
     for indicator in indicators:
-        st.markdown(f"#### Valori per l'indicatore: **{indicator}**")
-        values = []
-        for idx, row in df_parks.iterrows():
-            val = st.number_input(
-                label=f"{row['Nome Parco']} - {indicator}",
-                min_value=0.0,
-                max_value=1.0,
-                value=0.0,
-                step=0.01,
-                key=f"{indicator}_{idx}"
-            )
-            values.append(val)
-        assignment_df[indicator] = values
-    
-    st.subheader("Tabella di assegnazione valori")
-    st.dataframe(assignment_df)
-    
-    # Calcolo del valore composito per ogni parco:
-    # composite = Copertura Vegetale + somma(per ogni indicatore: (Peso AHP * valore assegnato))
+        assignment_df[indicator] = 0.0
+
+    st.markdown("### Modifica la tabella dei valori da assegnare")
+    # Se il tuo ambiente supporta il data editor, usalo; altrimenti fornisce una textarea con CSV
+    if hasattr(st, "experimental_data_editor"):
+        edited_assignment_df = st.experimental_data_editor(assignment_df, num_rows="dynamic")
+    elif hasattr(st, "data_editor"):
+        edited_assignment_df = st.data_editor(assignment_df, num_rows="dynamic")
+    else:
+        st.info("Il data editor non è disponibile. Modifica il CSV sottostante e premi INVIO.")
+        csv_text = st.text_area("Modifica CSV", assignment_df.to_csv(index=False))
+        try:
+            edited_assignment_df = pd.read_csv(io.StringIO(csv_text))
+        except Exception as e:
+            st.error("Errore nella conversione del CSV: " + str(e))
+            edited_assignment_df = assignment_df
+
+    st.subheader("Tabella di assegnazione valori (modificata)")
+    st.dataframe(edited_assignment_df)
+
+    # ==========================================
+    # 4. Calcolo del Valore Composito
+    # ==========================================
+    # Per ogni parco: Composite = Copertura Vegetale + sum_i( Peso_i * Valore_i )
     composite_values = []
-    for idx, row in assignment_df.iterrows():
+    # Unisci i dati dei parchi (per Copertura Vegetale) con la tabella assegnata (tramite "Nome Parco")
+    merged_df = pd.merge(df_parks[["Nome Parco", "Copertura Vegetale"]], edited_assignment_df, on="Nome Parco", how="left")
+    for idx, row in merged_df.iterrows():
         weighted_sum = 0
         for indicator in indicators:
             weight = weights_dict.get(indicator, 0)
-            assigned = row[indicator]
-            weighted_sum += weight * assigned
-        veg_cover = df_parks.loc[idx, "Copertura Vegetale"]
+            assigned_value = row.get(indicator, 0)
+            weighted_sum += weight * assigned_value
+        veg_cover = row["Copertura Vegetale"]
         composite = veg_cover + weighted_sum
         composite_values.append(composite)
-    
-    # Aggiungiamo la colonna "Composite Value" al dataframe dei parchi
+    # Aggiungi la colonna "Composite Value" al dataset dei parchi
     df_parks["Composite Value"] = composite_values
+    st.subheader("Dati dei Parchi con Valore Composito")
+    st.dataframe(df_parks)
 else:
-    st.info("Carica il file AHP per assegnare valori agli indici.")
+    st.info("Carica il file AHP per assegnare i valori agli indici.")
 
-# --------------------------
-# 4. Visualizzazione su Mappa in due colonne
-# --------------------------
+# ==========================================
+# 5. Visualizzazione su Mappa (due colonne)
+# ==========================================
 st.subheader("Visualizzazione dei Parchi su Mappa")
 
 # Prepara i dati per Pydeck: rinomina le colonne per le coordinate
-df_map = df_parks.rename(columns={"Coordinata X": "lon", "Coordinata Y": "lat"})
+df_map = df_parks.copy()
+df_map = df_map.rename(columns={"Coordinata X": "lon", "Coordinata Y": "lat"})
 
-# Creiamo due colonne per visualizzare le mappe affiancate
+# Per sicurezza, aggiungiamo le colonne per il raggio dei pallini
+# Moltiplichiamo per un fattore (es. 10) per rendere visibili i pallini
+df_map["radius_composite"] = df_map["Composite Value"] * 10
+df_map["radius_veg"] = df_map["Copertura Vegetale"] * 10
+
+# Vista iniziale centrata sui parchi
+view_state = pdk.ViewState(
+    latitude=df_map["lat"].mean(),
+    longitude=df_map["lon"].mean(),
+    zoom=12,
+    pitch=0,
+)
+
+# Crea due colonne per visualizzare le mappe affiancate
 col_left, col_right = st.columns(2)
 
-# Mappa di sinistra: dimensione = Copertura Vegetale + (Peso AHP * Valore)
-if "Composite Value" in df_parks.columns:
-    left_layer = pdk.Layer(
-        "ScatterplotLayer",
-        data=df_map,
-        get_position='[lon, lat]',
-        get_fill_color='[200, 50, 80, 180]',
-        # Moltiplichiamo per un fattore di scala (ad esempio 10) per evidenziare la dimensione
-        get_radius="Composite Value * 10",
-        pickable=True,
-        auto_highlight=True,
-    )
-    left_deck = pdk.Deck(
-        layers=[left_layer],
-        initial_view_state=pdk.ViewState(
-            latitude=df_map["lat"].mean(),
-            longitude=df_map["lon"].mean(),
-            zoom=12,
-            pitch=0,
-        ),
-        tooltip={"text": "{Nome Parco}"}
-    )
-    col_left.subheader("Mappa con dimensione = Copertura Vegetale + AHP")
-    col_left.pydeck_chart(left_deck)
+# Mappa di sinistra: dimensione = Composite Value
+left_layer = pdk.Layer(
+    "ScatterplotLayer",
+    data=df_map,
+    get_position='[lon, lat]',
+    get_fill_color='[200, 50, 80, 180]',  # colore dei pallini
+    get_radius="radius_composite",         # usa il valore composito
+    pickable=True,
+    auto_highlight=True,
+)
+left_deck = pdk.Deck(
+    layers=[left_layer],
+    initial_view_state=view_state,
+    tooltip={"text": "{Nome Parco}\nComposite: {Composite Value}"}
+)
+col_left.subheader("Mappa - Dimensione = Copertura Vegetale + (AHP)")
+col_left.pydeck_chart(left_deck)
 
 # Mappa di destra: dimensione = Copertura Vegetale
 right_layer = pdk.Layer(
@@ -156,31 +171,27 @@ right_layer = pdk.Layer(
     data=df_map,
     get_position='[lon, lat]',
     get_fill_color='[50, 150, 200, 180]',
-    get_radius="Copertura Vegetale * 10",
+    get_radius="radius_veg",               # usa la copertura vegetale
     pickable=True,
     auto_highlight=True,
 )
 right_deck = pdk.Deck(
     layers=[right_layer],
-    initial_view_state=pdk.ViewState(
-        latitude=df_map["lat"].mean(),
-        longitude=df_map["lon"].mean(),
-        zoom=12,
-        pitch=0,
-    ),
-    tooltip={"text": "{Nome Parco}"}
+    initial_view_state=view_state,
+    tooltip={"text": "{Nome Parco}\nCopertura: {Copertura Vegetale}"}
 )
-col_right.subheader("Mappa con dimensione = Copertura Vegetale")
+col_right.subheader("Mappa - Dimensione = Copertura Vegetale")
 col_right.pydeck_chart(right_deck)
 
-# --------------------------
-# 5. Salvataggio della Tabella di Assegnazione
-# --------------------------
+# ==========================================
+# 6. Salvataggio della Tabella di Assegnazione
+# ==========================================
 if indicators:
+    st.subheader("Salvataggio della tabella di assegnazione")
     if st.button("Salva tabella assegnazioni in Excel"):
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            assignment_df.to_excel(writer, index=False, sheet_name='Assegnazioni')
+            edited_assignment_df.to_excel(writer, index=False, sheet_name='Assegnazioni')
         excel_data = output.getvalue()
         st.download_button(
             label="Scarica il file Excel delle assegnazioni",
