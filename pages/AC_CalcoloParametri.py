@@ -18,16 +18,11 @@ if uploaded_file is not None:
 if uploaded_file is None or df is None:
     # 1. Creazione del DataFrame di default
     data = [
-        {'Macrofamiglia': 'Mammiferi', 'Indicatore': 'Diversità delle specie'},
-        {'Macrofamiglia': 'Mammiferi', 'Indicatore': 'Abbondanza'},
-        {'Macrofamiglia': 'Uccelli', 'Indicatore': 'Varietà delle specie'},
-        {'Macrofamiglia': 'Uccelli', 'Indicatore': 'Numero di nidi'},
-        {'Macrofamiglia': 'Rettili', 'Indicatore': 'Distribuzione geografica'},
-        {'Macrofamiglia': 'Rettili', 'Indicatore': 'Percentuale specie a rischio'},
-        {'Macrofamiglia': 'Anfibi', 'Indicatore': 'Popolazione stanziale'},
-        {'Macrofamiglia': 'Anfibi', 'Indicatore': 'Indicatori qualità dell’acqua'},
-        {'Macrofamiglia': 'Insetti', 'Indicatore': 'Indice di biodiversità'},
-        {'Macrofamiglia': 'Insetti', 'Indicatore': 'Frequenza di apparizione'}
+        {'Macrofamiglia': 'Da definire', 'Indicatore': 'Biodiversità'},
+        {'Macrofamiglia': 'Da definire', 'Indicatore': 'Copertura vegetale'},
+        {'Macrofamiglia': 'Da definire', 'Indicatore': 'Permeabilità'},
+        {'Macrofamiglia': 'Da definire', 'Indicatore': 'Servizi'},
+        {'Macrofamiglia': 'Da definire', 'Indicatore': 'Tutela'}
     ]
     df = pd.DataFrame(data)
 
