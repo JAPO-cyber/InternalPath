@@ -100,7 +100,7 @@ if indicators:
             st.error("Errore nella conversione del CSV: " + str(e))
             edited_assignment_df = assignment_df
 
-    # Controlla che tutti i valori siano compresi tra 0 e 1; se no, li clippa e avvisa l'utente
+    # Verifica che tutti i valori siano compresi tra 0 e 1; se no, li clippa
     for indicator in indicators:
         if (edited_assignment_df[indicator] < 0).any() or (edited_assignment_df[indicator] > 1).any():
             st.error(f"I valori per l'indicatore '{indicator}' devono essere compresi tra 0 e 1. Valori fuori range sono stati limitati a questo intervallo.")
@@ -124,7 +124,6 @@ if indicators:
         veg_cover = row["Copertura Vegetale"]
         composite = veg_cover * (1 + weighted_sum)
         composite_values.append(composite)
-    # Verifica che la lunghezza della lista corrisponda al numero di parchi
     if len(composite_values) == len(df_parks):
         df_parks["Composite Value"] = composite_values
     else:
@@ -136,7 +135,39 @@ else:
     st.info("Carica il file AHP per assegnare i valori agli indici.")
 
 # ================================
-# 5. Visualizzazione su Mappa
+# 7. Calcolo Parametri di Connettività e Resilienza
+# ================================
+# Calcola V: numero di parchi
+V = df_parks.shape[0]
+# Calcola il numero massimo di coppie non ordinate: V*(V-1)/2
+max_L = int(V * (V - 1) / 2)
+# Slider per L, default a 0
+L = st.slider("Seleziona il valore di L (numero di coppie di parchi)", min_value=0, max_value=max_L, value=0)
+
+if V <= 2:
+    st.error("Il numero di parchi (V) deve essere maggiore di 2 per calcolare i parametri.")
+else:
+    # Calcola k = L / (3*(V-2))
+    k = L / (3 * (V - 2))
+    
+    # Calcola rho = (L - (V+1)) / (2*V - 5)
+    if (2 * V - 5) == 0:
+        st.error("Il denominatore per il calcolo di ρ è zero.")
+        rho = None
+    else:
+        rho = (L - (V + 1)) / (2 * V - 5)
+    
+    if rho is not None:
+        epsilon = k + rho
+        st.markdown("### Parametri di Connettività e Resilienza")
+        st.write(f"**Numero di parchi (V):** {V}")
+        st.write(f"**L (coppie di parchi):** {L} (massimo: {max_L})")
+        st.write(f"**Connettività (k):** {k}")
+        st.write(f"**Resilienza (ρ):** {rho}")
+        st.write(f"**Epsilon (k + ρ):** {epsilon}")
+
+# ================================
+# 8. Visualizzazione su Mappa
 # ================================
 st.subheader("Visualizzazione dei Parchi su Mappa")
 
@@ -213,7 +244,7 @@ col_right.subheader("Mappa: Copertura Vegetale")
 col_right.pydeck_chart(right_deck)
 
 # ================================
-# 6. Salvataggio della Tabella di Assegnazione
+# 9. Salvataggio della Tabella di Assegnazione
 # ================================
 if indicators:
     st.subheader("Salvataggio della Tabella di Assegnazione")
@@ -229,6 +260,7 @@ if indicators:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
         st.success("Tabella salvata correttamente!")
+
 
 
 
