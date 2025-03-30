@@ -3,7 +3,7 @@ import pandas as pd
 import pydeck as pdk
 import io
 
-# Imposta il layout a schermo intero (wide) per PC
+# Imposta il layout wide per PC
 st.set_page_config(layout="wide", page_title="AHP Parchi Bergamo")
 
 # ================================
@@ -86,7 +86,7 @@ if indicators:
         assignment_df[indicator] = 0.0
 
     st.markdown("### Modifica la tabella dei valori da assegnare")
-    # Usa il data editor se disponibile, ottimizzando lo spazio con use_container_width
+    # Usa il data editor se disponibile
     if hasattr(st, "experimental_data_editor"):
         edited_assignment_df = st.experimental_data_editor(assignment_df, num_rows="dynamic", use_container_width=True)
     elif hasattr(st, "data_editor"):
@@ -99,6 +99,12 @@ if indicators:
         except Exception as e:
             st.error("Errore nella conversione del CSV: " + str(e))
             edited_assignment_df = assignment_df
+
+    # Controlla che tutti i valori siano compresi tra 0 e 1; se no, li clippa e avvisa l'utente
+    for indicator in indicators:
+        if (edited_assignment_df[indicator] < 0).any() or (edited_assignment_df[indicator] > 1).any():
+            st.error(f"I valori per l'indicatore '{indicator}' devono essere compresi tra 0 e 1. Valori fuori range sono stati limitati a questo intervallo.")
+            edited_assignment_df[indicator] = edited_assignment_df[indicator].clip(lower=0, upper=1)
 
     st.subheader("Tabella di assegnazione valori (modificata)")
     st.dataframe(edited_assignment_df, use_container_width=True)
@@ -118,7 +124,11 @@ if indicators:
         veg_cover = row["Copertura Vegetale"]
         composite = veg_cover * (1 + weighted_sum)
         composite_values.append(composite)
-    df_parks["Composite Value"] = composite_values
+    # Verifica che la lunghezza della lista corrisponda al numero di parchi
+    if len(composite_values) == len(df_parks):
+        df_parks["Composite Value"] = composite_values
+    else:
+        st.error("Errore nel calcolo dei valori compositi.")
 
     st.subheader("Dati dei Parchi con Valore Composito")
     st.dataframe(df_parks, use_container_width=True)
@@ -145,7 +155,7 @@ view_state = pdk.ViewState(
     pitch=0,
 )
 
-# Creazione della legenda in HTML (ottimizzata per PC)
+# Legenda in HTML
 legend_html = """
 <div style="background-color: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; font-size: 14px;">
   <h4 style="margin-bottom: 5px;">Legenda Mappa</h4>
@@ -219,5 +229,6 @@ if indicators:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
         st.success("Tabella salvata correttamente!")
+
 
 
