@@ -70,4 +70,32 @@ deck = pdk.Deck(
     tooltip={"text": "{Nome Parco}"}
 )
 
-st.subheader("
+st.subheader("Verifica la posizione dei parchi sulla mappa")
+st.pydeck_chart(deck)
+
+# 3. Modifica a schermo dei dati tramite data editor
+st.subheader("Modifica i dati dei parchi")
+edited_df = st.experimental_data_editor(
+    df_parks,
+    num_rows="dynamic",
+    use_container_width=True,
+    key="data_editor_parks"
+)
+
+# 4. Salvataggio dei dati modificati
+if st.button("Salva dati modificati in Excel"):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        edited_df.to_excel(writer, index=False, sheet_name='Parchi')
+    excel_data = output.getvalue()
+    
+    st.download_button(
+        label="Scarica il file Excel aggiornato",
+        data=excel_data,
+        file_name="parchi_modificati.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    # Inoltre, si può salvare localmente se necessario
+    edited_df.to_excel("parchi_modificati.xlsx", index=False)
+    st.success("Dati salvati correttamente!")
+
